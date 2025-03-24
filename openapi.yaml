@@ -61,6 +61,7 @@ paths:
           content:
             application/json:
               schema:
+                type: object
                 properties:
                   message:
                     type: string
@@ -90,12 +91,25 @@ paths:
           description: successfully got a list of transfers
           content:
             application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/TransferItem"
+              schema:                  
+                type: object
+                properties:
+                  transfers:
+                    type: array
+                    $ref: "#/components/schemas/TransferItem"
+                  total:
+                    type: integer
+                    format: uint
         "403":
-          description: the user is not logged in
+          description: the user doesn't have the right to request such a transfer job or there's no valid logged-in user
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    description: gives further context to the reason why the request was denied
 
 
 components:
