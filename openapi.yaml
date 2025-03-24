@@ -1,0 +1,132 @@
+openapi: 3.0.3
+info:
+  title: Globus Transfer Service API
+  description: |-
+    Rest API for the Globus Transfer Service. It uses Scicat tokens for authentication.
+  version: 1.0.0
+tags:
+  - name: auth
+    description: Operations related to authentication
+  - name: transfer
+    description: Operations related to data transfers
+  - name: other
+    description: Further operations for general information
+
+paths: 
+  /transfer:
+    post:
+      tags:
+        - transfer
+      summary: request a transfer job
+      description: It allows for requesting transfer jobs against a SciCat token. It uses the service account configured with the service's instance
+      operationId: TransferPostJob
+      parameters:
+        - name: sourceFacility
+          in: query
+          required: true
+          schema:
+            type: string
+            description: facility to use as source
+        - name: sourcePath
+          in: query
+          required: true
+          schema:
+            type: string
+            description: the source path on the facility globus connect server
+        - name: destFacility
+          in: query
+          required: true
+          schema:
+            type: string
+            description: facility to use as destination
+        - name: scicatPid
+          in: query
+          required: true
+          schema:
+            type: string
+            description: the SciCat PID of the dataset being transferred
+      responses: 
+        "200":
+          description: successfully started a transfer job
+          content:
+            application/json:
+              schema:
+                properties:
+                  jobId:
+                    type: string
+                    description: the job id of the transfer job that was created
+            
+        "403":
+          description: the user doesn't have the right to request such a transfer job or there's no valid logged-in user
+          content:
+            application/json:
+              schema:
+                properties:
+                  message:
+                    type: string
+                    description: gives further context to the reason why the request was denied
+    
+    get:
+      tags:
+        - transfer
+      summary: requests a list of transfers 
+      description: request a list of transfers that correspond to the currently interacting user
+      operationId: TransferGetList
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            format: uint
+            description: the page to request
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            format: uint
+            description: the number of elements to display per page
+      responses:
+        "200":
+          description: successfully got a list of transfers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TransferItem"
+        "403":
+          description: the user is not logged in
+
+
+components:
+  securitySchemes:
+    ScicatKeyAuth:
+      type: apiKey
+      in: header
+      name: SCICAT-API-Key
+  
+  schemas:
+    TransferItem:
+      type: object
+      properties:
+        transferId:
+          type: string
+        status:
+          type: string
+          enum: [waiting, transferring, finished, failed, cancelled, invalid status]
+        message:
+          type: string
+        bytesTransferred:
+          type: integer
+        bytesTotal:
+          type: integer
+        filesTransferred:
+          type: integer
+        filesTotal:
+          type: integer
+      required:
+        - transferId
+        - status
+
+security:
+  - ScicatKeyAuth: []

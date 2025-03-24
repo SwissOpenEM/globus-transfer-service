@@ -1,0 +1,5 @@
+apiPath: "internal/server/"
+interfaceOnly: true
+packageName: api
+packageVersion: 1.0.0
+serverPort: 8080
