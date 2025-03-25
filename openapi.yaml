@@ -55,7 +55,15 @@ paths:
                   jobId:
                     type: string
                     description: the job id of the transfer job that was created
-            
+        "400":
+          description: something went wrong with the request, usually due to some external service signalling an error
+          content:
+            application/json:
+              schema:
+                properties:
+                  message:
+                    type: string
+                    description: gives further context for failure
         "403":
           description: the user doesn't have the right to request such a transfer job or there's no valid logged-in user
           content:
@@ -66,58 +74,13 @@ paths:
                   message:
                     type: string
                     description: gives further context to the reason why the request was denied
-    
-    get:
-      tags:
-        - transfer
-      summary: requests a list of transfers 
-      description: request a list of transfers that correspond to the currently interacting user
-      operationId: TransferGetList
-      parameters:
-        - name: page
-          in: query
-          schema:
-            type: integer
-            format: uint
-            description: the page to request
-        - name: pageSize
-          in: query
-          schema:
-            type: integer
-            format: uint
-            description: the number of elements to display per page
-      responses:
-        "200":
-          description: successfully got a list of transfers
-          content:
-            application/json:
-              schema:                  
-                type: object
-                properties:
-                  transfers:
-                    type: array
-                    $ref: "#/components/schemas/TransferItem"
-                  total:
-                    type: integer
-                    format: uint
-        "403":
-          description: the user doesn't have the right to request such a transfer job or there's no valid logged-in user
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                    description: gives further context to the reason why the request was denied
-
 
 components:
   securitySchemes:
     ScicatKeyAuth:
       type: apiKey
       in: header
-      name: SCICAT-API-Key
+      name: SciCat-API-Key
   
   schemas:
     TransferItem:
