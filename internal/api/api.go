@@ -9,36 +9,37 @@ import (
 
 //go:generate go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen --config=cfg.yaml ../../openapi.yaml
 
-type Server struct {
-	globusClient                    globus.GlobusClient
-	facilityToGlobusCollectionIDMap map[string]string
+type ServerHandler struct {
+	globusClient          globus.GlobusClient
+	facilityCollectionIDs map[string]string
 }
 
-var _ StrictServerInterface = Server{}
+var _ StrictServerInterface = ServerHandler{}
 
-func NewServer(clientID string, clientSecret string, scopes []string) (Server, error) {
+func NewServerHandler(clientID string, clientSecret string, scopes []string, facilityCollectionIDs map[string]string) (ServerHandler, error) {
 	// create server with service client
 	var err error
 	globusClient, err := globus.AuthCreateServiceClient(context.Background(), clientID, clientSecret, scopes)
 	if err != nil {
-		return Server{}, err
+		return ServerHandler{}, err
 	}
 	if !globusClient.IsClientSet() {
-		return Server{}, fmt.Errorf("AUTH error: Client is nil")
+		return ServerHandler{}, fmt.Errorf("AUTH error: Client is nil")
 	}
-	return Server{
-		globusClient: globusClient,
+	return ServerHandler{
+		globusClient:          globusClient,
+		facilityCollectionIDs: facilityCollectionIDs,
 	}, err
 }
 
-func (s Server) TransferPostJob(ctx context.Context, request TransferPostJobRequestObject) (TransferPostJobResponseObject, error) {
-	sourceCollectionID, ok := s.facilityToGlobusCollectionIDMap[request.Params.SourceFacility]
+func (s ServerHandler) TransferPostJob(ctx context.Context, request TransferPostJobRequestObject) (TransferPostJobResponseObject, error) {
+	sourceCollectionID, ok := s.facilityCollectionIDs[request.Params.SourceFacility]
 	if !ok {
 		return TransferPostJob403JSONResponse{
 			Message: getPointerOrNil("invalid source facility"),
 		}, nil
 	}
-	destCollectionID, ok := s.facilityToGlobusCollectionIDMap[request.Params.DestFacility]
+	destCollectionID, ok := s.facilityCollectionIDs[request.Params.DestFacility]
 	if !ok {
 		return TransferPostJob403JSONResponse{
 			Message: getPointerOrNil("invalid destination facility"),
