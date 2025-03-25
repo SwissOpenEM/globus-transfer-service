@@ -8,7 +8,10 @@ require (
 	github.com/oapi-codegen/runtime v1.1.1
 )
 
+require golang.org/x/oauth2 v0.19.0 // indirect
+
 require (
+	github.com/SwissOpenEM/globus v0.1.1
 	github.com/apapsch/go-jsonmerge/v2 v2.0.0 // indirect
 	github.com/bytedance/sonic v1.11.6 // indirect
 	github.com/bytedance/sonic/loader v0.1.1 // indirect

@@ -25,36 +25,6 @@ const (
 	ScicatKeyAuthScopes = "ScicatKeyAuth.Scopes"
 )
 
-// Defines values for TransferItemStatus.
-const (
-	Cancelled     TransferItemStatus = "cancelled"
-	Failed        TransferItemStatus = "failed"
-	Finished      TransferItemStatus = "finished"
-	InvalidStatus TransferItemStatus = "invalid status"
-	Transferring  TransferItemStatus = "transferring"
-	Waiting       TransferItemStatus = "waiting"
-)
-
-// TransferItem defines model for TransferItem.
-type TransferItem struct {
-	BytesTotal       *int               `json:"bytesTotal,omitempty"`
-	BytesTransferred *int               `json:"bytesTransferred,omitempty"`
-	FilesTotal       *int               `json:"filesTotal,omitempty"`
-	FilesTransferred *int               `json:"filesTransferred,omitempty"`
-	Message          *string            `json:"message,omitempty"`
-	Status           TransferItemStatus `json:"status"`
-	TransferId       string             `json:"transferId"`
-}
-
-// TransferItemStatus defines model for TransferItem.Status.
-type TransferItemStatus string
-
-// TransferGetListParams defines parameters for TransferGetList.
-type TransferGetListParams struct {
-	Page     *uint `form:"page,omitempty" json:"page,omitempty"`
-	PageSize *uint `form:"pageSize,omitempty" json:"pageSize,omitempty"`
-}
-
 // TransferPostJobParams defines parameters for TransferPostJob.
 type TransferPostJobParams struct {
 	SourceFacility string `form:"sourceFacility" json:"sourceFacility"`
@@ -65,9 +35,6 @@ type TransferPostJobParams struct {
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
-	// requests a list of transfers
-	// (GET /transfer)
-	TransferGetList(c *gin.Context, params TransferGetListParams)
 	// request a transfer job
 	// (POST /transfer)
 	TransferPostJob(c *gin.Context, params TransferPostJobParams)
@@ -81,42 +48,6 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(c *gin.Context)
-
-// TransferGetList operation middleware
-func (siw *ServerInterfaceWrapper) TransferGetList(c *gin.Context) {
-
-	var err error
-
-	c.Set(ScicatKeyAuthScopes, []string{})
-
-	// Parameter object where we will unmarshal all parameters from the context
-	var params TransferGetListParams
-
-	// ------------- Optional query parameter "page" -------------
-
-	err = runtime.BindQueryParameter("form", true, false, "page", c.Request.URL.Query(), &params.Page)
-	if err != nil {
-		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter page: %w", err), http.StatusBadRequest)
-		return
-	}
-
-	// ------------- Optional query parameter "pageSize" -------------
-
-	err = runtime.BindQueryParameter("form", true, false, "pageSize", c.Request.URL.Query(), &params.PageSize)
-	if err != nil {
-		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter pageSize: %w", err), http.StatusBadRequest)
-		return
-	}
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		middleware(c)
-		if c.IsAborted() {
-			return
-		}
-	}
-
-	siw.Handler.TransferGetList(c, params)
-}
 
 // TransferPostJob operation middleware
 func (siw *ServerInterfaceWrapper) TransferPostJob(c *gin.Context) {
@@ -225,40 +156,7 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 		ErrorHandler:       errorHandler,
 	}
 
-	router.GET(options.BaseURL+"/transfer", wrapper.TransferGetList)
 	router.POST(options.BaseURL+"/transfer", wrapper.TransferPostJob)
-}
-
-type TransferGetListRequestObject struct {
-	Params TransferGetListParams
-}
-
-type TransferGetListResponseObject interface {
-	VisitTransferGetListResponse(w http.ResponseWriter) error
-}
-
-type TransferGetList200JSONResponse struct {
-	Total     *uint         `json:"total,omitempty"`
-	Transfers *TransferItem `json:"transfers,omitempty"`
-}
-
-func (response TransferGetList200JSONResponse) VisitTransferGetListResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(200)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type TransferGetList403JSONResponse struct {
-	// Message gives further context to the reason why the request was denied
-	Message *string `json:"message,omitempty"`
-}
-
-func (response TransferGetList403JSONResponse) VisitTransferGetListResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(403)
-
-	return json.NewEncoder(w).Encode(response)
 }
 
 type TransferPostJobRequestObject struct {
@@ -281,6 +179,18 @@ func (response TransferPostJob200JSONResponse) VisitTransferPostJobResponse(w ht
 	return json.NewEncoder(w).Encode(response)
 }
 
+type TransferPostJob400JSONResponse struct {
+	// Message gives further context for failure
+	Message *string `json:"message,omitempty"`
+}
+
+func (response TransferPostJob400JSONResponse) VisitTransferPostJobResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
 type TransferPostJob403JSONResponse struct {
 	// Message gives further context to the reason why the request was denied
 	Message *string `json:"message,omitempty"`
@@ -295,9 +205,6 @@ func (response TransferPostJob403JSONResponse) VisitTransferPostJobResponse(w ht
 
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
-	// requests a list of transfers
-	// (GET /transfer)
-	TransferGetList(ctx context.Context, request TransferGetListRequestObject) (TransferGetListResponseObject, error)
 	// request a transfer job
 	// (POST /transfer)
 	TransferPostJob(ctx context.Context, request TransferPostJobRequestObject) (TransferPostJobResponseObject, error)
@@ -313,33 +220,6 @@ func NewStrictHandler(ssi StrictServerInterface, middlewares []StrictMiddlewareF
 type strictHandler struct {
 	ssi         StrictServerInterface
 	middlewares []StrictMiddlewareFunc
-}
-
-// TransferGetList operation middleware
-func (sh *strictHandler) TransferGetList(ctx *gin.Context, params TransferGetListParams) {
-	var request TransferGetListRequestObject
-
-	request.Params = params
-
-	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
-		return sh.ssi.TransferGetList(ctx, request.(TransferGetListRequestObject))
-	}
-	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "TransferGetList")
-	}
-
-	response, err := handler(ctx, request)
-
-	if err != nil {
-		ctx.Error(err)
-		ctx.Status(http.StatusInternalServerError)
-	} else if validResponse, ok := response.(TransferGetListResponseObject); ok {
-		if err := validResponse.VisitTransferGetListResponse(ctx.Writer); err != nil {
-			ctx.Error(err)
-		}
-	} else if response != nil {
-		ctx.Error(fmt.Errorf("unexpected response type: %T", response))
-	}
 }
 
 // TransferPostJob operation middleware
@@ -372,23 +252,20 @@ func (sh *strictHandler) TransferPostJob(ctx *gin.Context, params TransferPostJo
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"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",
+	"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",
+	"Nlec2Crc4enwdwAAAP//WmKwlG0IAAA=",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file
