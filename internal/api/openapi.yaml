@@ -19,7 +19,7 @@ paths:
         - transfer
       summary: request a transfer task
       description: It allows for requesting transfer tasks against a SciCat token. It uses the service account configured with the service's instance
-      operationId: TransferPostTask
+      operationId: PostTransferTask
       parameters:
         - name: sourceFacility
           in: query

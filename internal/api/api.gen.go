@@ -25,8 +25,8 @@ const (
 	ScicatKeyAuthScopes = "ScicatKeyAuth.Scopes"
 )
 
-// TransferPostTaskParams defines parameters for TransferPostTask.
-type TransferPostTaskParams struct {
+// PostTransferTaskParams defines parameters for PostTransferTask.
+type PostTransferTaskParams struct {
 	SourceFacility string `form:"sourceFacility" json:"sourceFacility"`
 	SourcePath     string `form:"sourcePath" json:"sourcePath"`
 	DestFacility   string `form:"destFacility" json:"destFacility"`
@@ -37,7 +37,7 @@ type TransferPostTaskParams struct {
 type ServerInterface interface {
 	// request a transfer task
 	// (POST /transfer)
-	TransferPostTask(c *gin.Context, params TransferPostTaskParams)
+	PostTransferTask(c *gin.Context, params PostTransferTaskParams)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -49,15 +49,15 @@ type ServerInterfaceWrapper struct {
 
 type MiddlewareFunc func(c *gin.Context)
 
-// TransferPostTask operation middleware
-func (siw *ServerInterfaceWrapper) TransferPostTask(c *gin.Context) {
+// PostTransferTask operation middleware
+func (siw *ServerInterfaceWrapper) PostTransferTask(c *gin.Context) {
 
 	var err error
 
 	c.Set(ScicatKeyAuthScopes, []string{})
 
 	// Parameter object where we will unmarshal all parameters from the context
-	var params TransferPostTaskParams
+	var params PostTransferTaskParams
 
 	// ------------- Required query parameter "sourceFacility" -------------
 
@@ -126,7 +126,7 @@ func (siw *ServerInterfaceWrapper) TransferPostTask(c *gin.Context) {
 		}
 	}
 
-	siw.Handler.TransferPostTask(c, params)
+	siw.Handler.PostTransferTask(c, params)
 }
 
 // GinServerOptions provides options for the Gin server.
@@ -156,47 +156,47 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 		ErrorHandler:       errorHandler,
 	}
 
-	router.POST(options.BaseURL+"/transfer", wrapper.TransferPostTask)
+	router.POST(options.BaseURL+"/transfer", wrapper.PostTransferTask)
 }
 
-type TransferPostTaskRequestObject struct {
-	Params TransferPostTaskParams
+type PostTransferTaskRequestObject struct {
+	Params PostTransferTaskParams
 }
 
-type TransferPostTaskResponseObject interface {
-	VisitTransferPostTaskResponse(w http.ResponseWriter) error
+type PostTransferTaskResponseObject interface {
+	VisitPostTransferTaskResponse(w http.ResponseWriter) error
 }
 
-type TransferPostTask200JSONResponse struct {
+type PostTransferTask200JSONResponse struct {
 	// TaskId the task id of the transfer task that was created
 	TaskId *string `json:"taskId,omitempty"`
 }
 
-func (response TransferPostTask200JSONResponse) VisitTransferPostTaskResponse(w http.ResponseWriter) error {
+func (response PostTransferTask200JSONResponse) VisitPostTransferTaskResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type TransferPostTask400JSONResponse struct {
+type PostTransferTask400JSONResponse struct {
 	// Message gives further context for failure
 	Message *string `json:"message,omitempty"`
 }
 
-func (response TransferPostTask400JSONResponse) VisitTransferPostTaskResponse(w http.ResponseWriter) error {
+func (response PostTransferTask400JSONResponse) VisitPostTransferTaskResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(400)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type TransferPostTask403JSONResponse struct {
+type PostTransferTask403JSONResponse struct {
 	// Message gives further context to the reason why the request was denied
 	Message *string `json:"message,omitempty"`
 }
 
-func (response TransferPostTask403JSONResponse) VisitTransferPostTaskResponse(w http.ResponseWriter) error {
+func (response PostTransferTask403JSONResponse) VisitPostTransferTaskResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(403)
 
@@ -207,7 +207,7 @@ func (response TransferPostTask403JSONResponse) VisitTransferPostTaskResponse(w 
 type StrictServerInterface interface {
 	// request a transfer task
 	// (POST /transfer)
-	TransferPostTask(ctx context.Context, request TransferPostTaskRequestObject) (TransferPostTaskResponseObject, error)
+	PostTransferTask(ctx context.Context, request PostTransferTaskRequestObject) (PostTransferTaskResponseObject, error)
 }
 
 type StrictHandlerFunc = strictgin.StrictGinHandlerFunc
@@ -222,17 +222,17 @@ type strictHandler struct {
 	middlewares []StrictMiddlewareFunc
 }
 
-// TransferPostTask operation middleware
-func (sh *strictHandler) TransferPostTask(ctx *gin.Context, params TransferPostTaskParams) {
-	var request TransferPostTaskRequestObject
+// PostTransferTask operation middleware
+func (sh *strictHandler) PostTransferTask(ctx *gin.Context, params PostTransferTaskParams) {
+	var request PostTransferTaskRequestObject
 
 	request.Params = params
 
 	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
-		return sh.ssi.TransferPostTask(ctx, request.(TransferPostTaskRequestObject))
+		return sh.ssi.PostTransferTask(ctx, request.(PostTransferTaskRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "TransferPostTask")
+		handler = middleware(handler, "PostTransferTask")
 	}
 
 	response, err := handler(ctx, request)
@@ -240,8 +240,8 @@ func (sh *strictHandler) TransferPostTask(ctx *gin.Context, params TransferPostT
 	if err != nil {
 		ctx.Error(err)
 		ctx.Status(http.StatusInternalServerError)
-	} else if validResponse, ok := response.(TransferPostTaskResponseObject); ok {
-		if err := validResponse.VisitTransferPostTaskResponse(ctx.Writer); err != nil {
+	} else if validResponse, ok := response.(PostTransferTaskResponseObject); ok {
+		if err := validResponse.VisitPostTransferTaskResponse(ctx.Writer); err != nil {
 			ctx.Error(err)
 		}
 	} else if response != nil {
@@ -257,7 +257,7 @@ var swaggerSpec = []string{
 	"t+vV1WfaucrpbrRzHIN93u/3lQuxSQZQk3gOo4ZkSH+SKNyuV9AkBu0Ifu/TQxb4whilIYY74k3wtICV",
 	"QhYSmBiBpkeKUsowa0dR7TikuLD2QXvr/zdg1tBVbkMsE4ufFteLa7evXBop4hjc0t0srhc3rnIjalec",
 	"+Kgzin0Yk+ilmJUC9n3aTrSYvmcSDbGFQykoyqMAthiiKCBMxk1iThLNB5mpovcpRwWfYhPazFTDNmj3",
-	"/DcfBAwOoydXJHAxYlW7pTtIXyfRLyiPRRHjQEosbvl1Huj3TLw7zVNSZk+f0Ic+qJ2blsBUu6VypsqJ",
+	"/DcfBAwOoydXJHAxYlW7pVsn0YP8LyiPRRHjQEosbvl1Huj3TLw7zVNSZk+f0Ic+qJ2blsBUu6VypsqJ",
 	"JQQvHWjmEtBkUgAFJqxTJkQ5xNbt99U/9V6jdu/oW9wohWADgxSLQUc67RQEn2Ikr8W4kt83cqpJ9L9x",
 	"oy6JKPN5hyUl8utQv9OROV3r1W+QmmJIjYpCCg/0PJYGd0nm3prJmKJMq+Dn62v741NUiiX9OI79fOs+",
 	"fhNr+/SMz8gWRQ1TtSXfEvkaT/sOQn0g+eK2gHaosEUBz4T6KtOyX17CSvaeRJrc9zsQRVaqAV9C24X/",
@@ -265,7 +265,7 @@ var swaggerSpec = []string{
 	"ccT+uEgktBH73sAwAjEnngy4+f8M0DQTR0kRtt3uuY4y5JpieHXGx5P08I28ulfcMqwsxFAnkvhBocMN",
 	"TR1C25Xuh1aSfXceB5heILZ9GhNssA819Kltqb4KsSAXHpKHAXnnlu6Adp6ryim2tl3d8c24L3wPD2xZ",
 	"vGdP69d7u3Fz4bmdfxyWugBTb9fA1Lx8+E77ws6dLZO3gNhKOPKXE8iR+iXQp3ms6QRo0W4pEmMP9tLz",
-	"cMYpWYXb3+//CgAA//8P+kljdQgAAA==",
+	"cMYpWYXb3+//CgAA///1vThldQgAAA==",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file

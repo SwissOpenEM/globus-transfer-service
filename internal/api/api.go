@@ -32,16 +32,16 @@ func NewServerHandler(clientID string, clientSecret string, scopes []string, fac
 	}, err
 }
 
-func (s ServerHandler) TransferPostTask(ctx context.Context, request TransferPostTaskRequestObject) (TransferPostTaskResponseObject, error) {
+func (s ServerHandler) PostTransferTask(ctx context.Context, request PostTransferTaskRequestObject) (PostTransferTaskResponseObject, error) {
 	sourceCollectionID, ok := s.facilityCollectionIDs[request.Params.SourceFacility]
 	if !ok {
-		return TransferPostTask403JSONResponse{
+		return PostTransferTask403JSONResponse{
 			Message: getPointerOrNil("invalid source facility"),
 		}, nil
 	}
 	destCollectionID, ok := s.facilityCollectionIDs[request.Params.DestFacility]
 	if !ok {
-		return TransferPostTask403JSONResponse{
+		return PostTransferTask403JSONResponse{
 			Message: getPointerOrNil("invalid destination facility"),
 		}, nil
 	}
@@ -59,12 +59,12 @@ func (s ServerHandler) TransferPostTask(ctx context.Context, request TransferPos
 
 	result, err := s.globusClient.TransferFolderSync(sourceCollectionID, sourcePath, destCollectionID, "/service_user/"+request.Params.ScicatPid, false)
 	if err != nil {
-		return TransferPostTask400JSONResponse{
+		return PostTransferTask400JSONResponse{
 			Message: getPointerOrNil(fmt.Sprintf("transfer request failed: %s", err.Error())),
 		}, nil
 	}
 
-	return TransferPostTask200JSONResponse{
+	return PostTransferTask200JSONResponse{
 		TaskId: getPointerOrNil(result.TaskId),
 	}, nil
 }
