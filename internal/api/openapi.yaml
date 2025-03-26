@@ -17,9 +17,9 @@ paths:
     post:
       tags:
         - transfer
-      summary: request a transfer job
-      description: It allows for requesting transfer jobs against a SciCat token. It uses the service account configured with the service's instance
-      operationId: TransferPostJob
+      summary: request a transfer task
+      description: It allows for requesting transfer tasks against a SciCat token. It uses the service account configured with the service's instance
+      operationId: TransferPostTask
       parameters:
         - name: sourceFacility
           in: query
@@ -47,14 +47,14 @@ paths:
             description: the SciCat PID of the dataset being transferred
       responses: 
         "200":
-          description: successfully started a transfer job
+          description: successfully started a transfer task
           content:
             application/json:
               schema:
                 properties:
-                  jobId:
+                  taskId:
                     type: string
-                    description: the job id of the transfer job that was created
+                    description: the task id of the transfer task that was created
         "400":
           description: something went wrong with the request, usually due to some external service signalling an error
           content:
@@ -65,7 +65,7 @@ paths:
                     type: string
                     description: gives further context for failure
         "403":
-          description: the user doesn't have the right to request such a transfer job or there's no valid logged-in user
+          description: the user doesn't have the right to request such a transfer task or there's no valid logged-in user
           content:
             application/json:
               schema:
