@@ -25,8 +25,8 @@ const (
 	ScicatKeyAuthScopes = "ScicatKeyAuth.Scopes"
 )
 
-// TransferPostJobParams defines parameters for TransferPostJob.
-type TransferPostJobParams struct {
+// TransferPostTaskParams defines parameters for TransferPostTask.
+type TransferPostTaskParams struct {
 	SourceFacility string `form:"sourceFacility" json:"sourceFacility"`
 	SourcePath     string `form:"sourcePath" json:"sourcePath"`
 	DestFacility   string `form:"destFacility" json:"destFacility"`
@@ -35,9 +35,9 @@ type TransferPostJobParams struct {
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
-	// request a transfer job
+	// request a transfer task
 	// (POST /transfer)
-	TransferPostJob(c *gin.Context, params TransferPostJobParams)
+	TransferPostTask(c *gin.Context, params TransferPostTaskParams)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -49,15 +49,15 @@ type ServerInterfaceWrapper struct {
 
 type MiddlewareFunc func(c *gin.Context)
 
-// TransferPostJob operation middleware
-func (siw *ServerInterfaceWrapper) TransferPostJob(c *gin.Context) {
+// TransferPostTask operation middleware
+func (siw *ServerInterfaceWrapper) TransferPostTask(c *gin.Context) {
 
 	var err error
 
 	c.Set(ScicatKeyAuthScopes, []string{})
 
 	// Parameter object where we will unmarshal all parameters from the context
-	var params TransferPostJobParams
+	var params TransferPostTaskParams
 
 	// ------------- Required query parameter "sourceFacility" -------------
 
@@ -126,7 +126,7 @@ func (siw *ServerInterfaceWrapper) TransferPostJob(c *gin.Context) {
 		}
 	}
 
-	siw.Handler.TransferPostJob(c, params)
+	siw.Handler.TransferPostTask(c, params)
 }
 
 // GinServerOptions provides options for the Gin server.
@@ -156,47 +156,47 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 		ErrorHandler:       errorHandler,
 	}
 
-	router.POST(options.BaseURL+"/transfer", wrapper.TransferPostJob)
+	router.POST(options.BaseURL+"/transfer", wrapper.TransferPostTask)
 }
 
-type TransferPostJobRequestObject struct {
-	Params TransferPostJobParams
+type TransferPostTaskRequestObject struct {
+	Params TransferPostTaskParams
 }
 
-type TransferPostJobResponseObject interface {
-	VisitTransferPostJobResponse(w http.ResponseWriter) error
+type TransferPostTaskResponseObject interface {
+	VisitTransferPostTaskResponse(w http.ResponseWriter) error
 }
 
-type TransferPostJob200JSONResponse struct {
-	// JobId the job id of the transfer job that was created
-	JobId *string `json:"jobId,omitempty"`
+type TransferPostTask200JSONResponse struct {
+	// TaskId the task id of the transfer task that was created
+	TaskId *string `json:"taskId,omitempty"`
 }
 
-func (response TransferPostJob200JSONResponse) VisitTransferPostJobResponse(w http.ResponseWriter) error {
+func (response TransferPostTask200JSONResponse) VisitTransferPostTaskResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type TransferPostJob400JSONResponse struct {
+type TransferPostTask400JSONResponse struct {
 	// Message gives further context for failure
 	Message *string `json:"message,omitempty"`
 }
 
-func (response TransferPostJob400JSONResponse) VisitTransferPostJobResponse(w http.ResponseWriter) error {
+func (response TransferPostTask400JSONResponse) VisitTransferPostTaskResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(400)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type TransferPostJob403JSONResponse struct {
+type TransferPostTask403JSONResponse struct {
 	// Message gives further context to the reason why the request was denied
 	Message *string `json:"message,omitempty"`
 }
 
-func (response TransferPostJob403JSONResponse) VisitTransferPostJobResponse(w http.ResponseWriter) error {
+func (response TransferPostTask403JSONResponse) VisitTransferPostTaskResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(403)
 
@@ -205,9 +205,9 @@ func (response TransferPostJob403JSONResponse) VisitTransferPostJobResponse(w ht
 
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
-	// request a transfer job
+	// request a transfer task
 	// (POST /transfer)
-	TransferPostJob(ctx context.Context, request TransferPostJobRequestObject) (TransferPostJobResponseObject, error)
+	TransferPostTask(ctx context.Context, request TransferPostTaskRequestObject) (TransferPostTaskResponseObject, error)
 }
 
 type StrictHandlerFunc = strictgin.StrictGinHandlerFunc
@@ -222,17 +222,17 @@ type strictHandler struct {
 	middlewares []StrictMiddlewareFunc
 }
 
-// TransferPostJob operation middleware
-func (sh *strictHandler) TransferPostJob(ctx *gin.Context, params TransferPostJobParams) {
-	var request TransferPostJobRequestObject
+// TransferPostTask operation middleware
+func (sh *strictHandler) TransferPostTask(ctx *gin.Context, params TransferPostTaskParams) {
+	var request TransferPostTaskRequestObject
 
 	request.Params = params
 
 	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
-		return sh.ssi.TransferPostJob(ctx, request.(TransferPostJobRequestObject))
+		return sh.ssi.TransferPostTask(ctx, request.(TransferPostTaskRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "TransferPostJob")
+		handler = middleware(handler, "TransferPostTask")
 	}
 
 	response, err := handler(ctx, request)
@@ -240,8 +240,8 @@ func (sh *strictHandler) TransferPostJob(ctx *gin.Context, params TransferPostJo
 	if err != nil {
 		ctx.Error(err)
 		ctx.Status(http.StatusInternalServerError)
-	} else if validResponse, ok := response.(TransferPostJobResponseObject); ok {
-		if err := validResponse.VisitTransferPostJobResponse(ctx.Writer); err != nil {
+	} else if validResponse, ok := response.(TransferPostTaskResponseObject); ok {
+		if err := validResponse.VisitTransferPostTaskResponse(ctx.Writer); err != nil {
 			ctx.Error(err)
 		}
 	} else if response != nil {
@@ -252,20 +252,20 @@ func (sh *strictHandler) TransferPostJob(ctx *gin.Context, params TransferPostJo
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"H4sIAAAAAAAC/7xVTW8jNwz9K4Que5l43aYn34IWW7h7qNH0tsiB1tAzcsfirEjZawT+7wU144/YaZGg",
-	"xZ4SC8PH9x6fqGfnedNzpKjiZs9OyOcUdP/oW9pQOXr0waN+pv1D1tYOQnQz1xLWlFzlIm7Izeyrn1Hv",
-	"Hhbzu8+0d5XTfW/n2Af7fTgcKhfiig2gJvEp9BrYkP4gUXhYzGHFCbQl+LXjZRb4M2GUFSV4pLQNniYw",
-	"V8hCAgMjUP6LopQyzNpSVDsOHCfWPmhn/f8BzBq6ym0pycDih8l0MnWHynFPEfvgZu5+Mp3cu8r1qG1x",
-	"4qOOKPajZ9FbMXMF7DreDbQSfc0kGmIDx1JY81IAGwxRFBAG3wYtZ4Vmg4xM0XvOUcFzXIUmJ6phF7S9",
-	"/OaDgMFh9OSKglR8mNdu5o7KFyz6Gy+LnoQbUkriZl/GcX7NlPbnaQrn5OkT+tAFtXNTEhLVbqYpU+XE",
-	"8oG3+ldjCSibEkCBAeucCNEUYuMOh+rfei9Q23f0LWaUQrBxAcfiz4lOM8TAc4zktfhW0vtGTjWJ/j9u",
-	"1CUPZTzvsKQEfhHqdzoyhmsx/wV4VQypUVFIYUmXoTS4WzJP1kx6jjIsgh+nU/vjOSrFkn3s+268cx/X",
-	"Ym2fL/j0yZKoYahe89Ly+BrNNS8h1EeKlzcFtEWFHQr4RKiv0iyr5SWoZO9JZJW7bg+imJRqwBfIdtV/",
-	"+k+CNiSCDd1KasKWBFY5aUsJCvo3LftghaHLid4ogjekrY1pR1Fhl9j+Pd78cbVUkCWjyawzWcysCuib",
-	"UorYnXaIhCZi1xkYRqCUOA0G3H8/A5RH4igcYdfuL3WUGdcUw6sjPp3wck1e3StuGVYWSlAzSfyg0OKW",
-	"hg6haUv3YyvJvr1KAwxPT7JNGhm22IUaOm4aqu9CLMCFhuTNBtPezdwR7CpVlVNsbK+601vxVNgeH9ay",
-	"cq+e1C9PdtfGwmszfz9uc4FEnd0B0/LywTtvCjt3tkbeAmLL4ERfziAn6rdAn8ah8hnQgt1QpIQd2Auf",
-	"Nlec2Crc4enwdwAAAP//WmKwlG0IAAA=",
+	"H4sIAAAAAAAC/7xVwW7jRgz9FWIue1G8adOTb0GLLYw91Gj2tsiBGVHSbKQZLcmx1wj87wVHsp3YaZGg",
+	"RU+Jx+bje49vOE/Op2FMkaKKWz45IZ856O7OdzRQObrzwaN+pt1t1s4OQnRL1xHWxK5yEQdyS/vVr6hX",
+	"t+vV1WfaucrpbrRzHIN93u/3lQuxSQZQk3gOo4ZkSH+SKNyuV9AkBu0Ifu/TQxb4whilIYY74k3wtICV",
+	"QhYSmBiBpkeKUsowa0dR7TikuLD2QXvr/zdg1tBVbkMsE4ufFteLa7evXBop4hjc0t0srhc3rnIjalec",
+	"+Kgzin0Yk+ilmJUC9n3aTrSYvmcSDbGFQykoyqMAthiiKCBMxk1iThLNB5mpovcpRwWfYhPazFTDNmj3",
+	"/DcfBAwOoydXJHAxYlW7pTtIXyfRLyiPRRHjQEosbvl1Huj3TLw7zVNSZk+f0Ic+qJ2blsBUu6VypsqJ",
+	"JQQvHWjmEtBkUgAFJqxTJkQ5xNbt99U/9V6jdu/oW9wohWADgxSLQUc67RQEn2Ikr8W4kt83cqpJ9L9x",
+	"oy6JKPN5hyUl8utQv9OROV3r1W+QmmJIjYpCCg/0PJYGd0nm3prJmKJMq+Dn62v741NUiiX9OI79fOs+",
+	"fhNr+/SMz8gWRQ1TtSXfEvkaT/sOQn0g+eK2gHaosEUBz4T6KtOyX17CSvaeRJrc9zsQRVaqAV9C24X/",
+	"5V+JGkgEW7pU1YYNCTSZtSOGgv5Dy1ZoMPSZ6Y0q0kDa2ai2FBW2nOzfw/WfF0wFWTKazjqTRc2qgH4o",
+	"ccT+uEgktBH73sAwAjEnngy4+f8M0DQTR0kRtt3uuY4y5JpieHXGx5P08I28ulfcMqwsxFAnkvhBocMN",
+	"TR1C25Xuh1aSfXceB5heILZ9GhNssA819Kltqb4KsSAXHpKHAXnnlu6Adp6ryim2tl3d8c24L3wPD2xZ",
+	"vGdP69d7u3Fz4bmdfxyWugBTb9fA1Lx8+E77ws6dLZO3gNhKOPKXE8iR+iXQp3ms6QRo0W4pEmMP9tLz",
+	"cMYpWYXb3+//CgAA//8P+kljdQgAAA==",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file

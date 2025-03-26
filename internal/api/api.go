@@ -7,7 +7,7 @@ import (
 	"github.com/SwissOpenEM/globus"
 )
 
-//go:generate go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen --config=cfg.yaml ../../openapi.yaml
+//go:generate go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen --config=cfg.yaml openapi.yaml
 
 type ServerHandler struct {
 	globusClient          globus.GlobusClient
@@ -32,32 +32,40 @@ func NewServerHandler(clientID string, clientSecret string, scopes []string, fac
 	}, err
 }
 
-func (s ServerHandler) TransferPostJob(ctx context.Context, request TransferPostJobRequestObject) (TransferPostJobResponseObject, error) {
+func (s ServerHandler) TransferPostTask(ctx context.Context, request TransferPostTaskRequestObject) (TransferPostTaskResponseObject, error) {
 	sourceCollectionID, ok := s.facilityCollectionIDs[request.Params.SourceFacility]
 	if !ok {
-		return TransferPostJob403JSONResponse{
+		return TransferPostTask403JSONResponse{
 			Message: getPointerOrNil("invalid source facility"),
 		}, nil
 	}
 	destCollectionID, ok := s.facilityCollectionIDs[request.Params.DestFacility]
 	if !ok {
-		return TransferPostJob403JSONResponse{
+		return TransferPostTask403JSONResponse{
 			Message: getPointerOrNil("invalid destination facility"),
 		}, nil
 	}
 
 	sourcePath := request.Params.SourcePath
 	destPath := "/" + request.Params.ScicatPid
+	_ = destPath
 
-	result, err := s.globusClient.TransferFileList(sourceCollectionID, sourcePath, destCollectionID, destPath, []string{}, []bool{}, false)
+	/*result, err := s.globusClient.TransferFileList(sourceCollectionID, sourcePath, destCollectionID, destPath, []string{}, []bool{}, false)
 	if err != nil {
 		return TransferPostJob400JSONResponse{
 			Message: getPointerOrNil(fmt.Sprintf("transfer request failed: %s", err.Error())),
 		}, nil
+	}*/
+
+	result, err := s.globusClient.TransferFolderSync(sourceCollectionID, sourcePath, destCollectionID, "/service_user/"+request.Params.ScicatPid, false)
+	if err != nil {
+		return TransferPostTask400JSONResponse{
+			Message: getPointerOrNil(fmt.Sprintf("transfer request failed: %s", err.Error())),
+		}, nil
 	}
 
-	return TransferPostJob200JSONResponse{
-		JobId: getPointerOrNil(result.RequestId),
+	return TransferPostTask200JSONResponse{
+		TaskId: getPointerOrNil(result.TaskId),
 	}, nil
 }
 

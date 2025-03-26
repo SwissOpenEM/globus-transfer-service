@@ -14,10 +14,18 @@ func main() {
 
 	conf, err := config.ReadConfig()
 	if err != nil {
+		log.Fatalf("couldn't read config: %s", err.Error())
+	}
+
+	serverHandler, err := api.NewServerHandler(globusClientId, globusClientSecret, conf.GlobusScopes, conf.FacilityCollectionIDs)
+	if err != nil {
 		log.Fatal(err)
 	}
 
-	server, _ := api.NewServerHandler(globusClientId, globusClientSecret, conf.GlobusScopes, conf.FacilityCollectionIDs)
-	//log.Fatal(server)
-	_ = server
+	server, err := api.NewServer(&serverHandler, conf.Port)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	log.Fatal(server.ListenAndServe())
 }
