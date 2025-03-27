@@ -17,12 +17,12 @@ func main() {
 		log.Fatalf("couldn't read config: %s", err.Error())
 	}
 
-	serverHandler, err := api.NewServerHandler(globusClientId, globusClientSecret, conf.GlobusScopes, conf.FacilityCollectionIDs)
+	serverHandler, err := api.NewServerHandler(globusClientId, globusClientSecret, conf.GlobusScopes, conf.FacilityCollectionIDs, conf.FacilityAccessGroupTemplate)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	server, err := api.NewServer(&serverHandler, conf.Port)
+	server, err := api.NewServer(&serverHandler, conf.Port, conf.ScicatUrl)
 	if err != nil {
 		log.Fatal(err)
 	}

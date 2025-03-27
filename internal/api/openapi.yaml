@@ -64,16 +64,15 @@ paths:
                   message:
                     type: string
                     description: gives further context for failure
+        "401":
+          description: the user does not have a valid auth session, so the request is rejected
+          $ref: "#/components/responses/GeneralErrorResponse"
         "403":
           description: the user doesn't have the right to request such a transfer task or there's no valid logged-in user
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                    description: gives further context to the reason why the request was denied
+          $ref: "#/components/responses/GeneralErrorResponse"
+        "500":
+          description: an internal server error was encountered
+          $ref: "#/components/responses/GeneralErrorResponse"
 
 components:
   securitySchemes:
@@ -104,6 +103,22 @@ components:
       required:
         - transferId
         - status
+  
+  responses:
+    GeneralErrorResponse:
+      description: a general error resposne
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                description: the error message
+              details:
+                type: string
+                description: further details, debugging information
+
 
 security:
   - ScicatKeyAuth: []

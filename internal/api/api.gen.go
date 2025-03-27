@@ -25,6 +25,15 @@ const (
 	ScicatKeyAuthScopes = "ScicatKeyAuth.Scopes"
 )
 
+// GeneralErrorResponse defines model for GeneralErrorResponse.
+type GeneralErrorResponse struct {
+	// Details further details, debugging information
+	Details *string `json:"details,omitempty"`
+
+	// Message the error message
+	Message *string `json:"message,omitempty"`
+}
+
 // PostTransferTaskParams defines parameters for PostTransferTask.
 type PostTransferTaskParams struct {
 	SourceFacility string `form:"sourceFacility" json:"sourceFacility"`
@@ -159,6 +168,14 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 	router.POST(options.BaseURL+"/transfer", wrapper.PostTransferTask)
 }
 
+type GeneralErrorResponseJSONResponse struct {
+	// Details further details, debugging information
+	Details *string `json:"details,omitempty"`
+
+	// Message the error message
+	Message *string `json:"message,omitempty"`
+}
+
 type PostTransferTaskRequestObject struct {
 	Params PostTransferTaskParams
 }
@@ -191,14 +208,43 @@ func (response PostTransferTask400JSONResponse) VisitPostTransferTaskResponse(w 
 	return json.NewEncoder(w).Encode(response)
 }
 
+type PostTransferTask401JSONResponse struct {
+	GeneralErrorResponseJSONResponse
+}
+
+func (response PostTransferTask401JSONResponse) VisitPostTransferTaskResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
 type PostTransferTask403JSONResponse struct {
-	// Message gives further context to the reason why the request was denied
+	// Details further details, debugging information
+	Details *string `json:"details,omitempty"`
+
+	// Message the error message
 	Message *string `json:"message,omitempty"`
 }
 
 func (response PostTransferTask403JSONResponse) VisitPostTransferTaskResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PostTransferTask500JSONResponse struct {
+	// Details further details, debugging information
+	Details *string `json:"details,omitempty"`
+
+	// Message the error message
+	Message *string `json:"message,omitempty"`
+}
+
+func (response PostTransferTask500JSONResponse) VisitPostTransferTaskResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
 
 	return json.NewEncoder(w).Encode(response)
 }
@@ -252,20 +298,20 @@ func (sh *strictHandler) PostTransferTask(ctx *gin.Context, params PostTransferT
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"H4sIAAAAAAAC/7xVwW7jRgz9FWIue1G8adOTb0GLLYw91Gj2tsiBGVHSbKQZLcmx1wj87wVHsp3YaZGg",
-	"RU+Jx+bje49vOE/Op2FMkaKKWz45IZ856O7OdzRQObrzwaN+pt1t1s4OQnRL1xHWxK5yEQdyS/vVr6hX",
-	"t+vV1WfaucrpbrRzHIN93u/3lQuxSQZQk3gOo4ZkSH+SKNyuV9AkBu0Ifu/TQxb4whilIYY74k3wtICV",
-	"QhYSmBiBpkeKUsowa0dR7TikuLD2QXvr/zdg1tBVbkMsE4ufFteLa7evXBop4hjc0t0srhc3rnIjalec",
-	"+Kgzin0Yk+ilmJUC9n3aTrSYvmcSDbGFQykoyqMAthiiKCBMxk1iThLNB5mpovcpRwWfYhPazFTDNmj3",
-	"/DcfBAwOoydXJHAxYlW7pVsn0YP8LyiPRRHjQEosbvl1Huj3TLw7zVNSZk+f0Ic+qJ2blsBUu6VypsqJ",
-	"JQQvHWjmEtBkUgAFJqxTJkQ5xNbt99U/9V6jdu/oW9wohWADgxSLQUc67RQEn2Ikr8W4kt83cqpJ9L9x",
-	"oy6JKPN5hyUl8utQv9OROV3r1W+QmmJIjYpCCg/0PJYGd0nm3prJmKJMq+Dn62v741NUiiX9OI79fOs+",
-	"fhNr+/SMz8gWRQ1TtSXfEvkaT/sOQn0g+eK2gHaosEUBz4T6KtOyX17CSvaeRJrc9zsQRVaqAV9C24X/",
-	"5V+JGkgEW7pU1YYNCTSZtSOGgv5Dy1ZoMPSZ6Y0q0kDa2ai2FBW2nOzfw/WfF0wFWTKazjqTRc2qgH4o",
-	"ccT+uEgktBH73sAwAjEnngy4+f8M0DQTR0kRtt3uuY4y5JpieHXGx5P08I28ulfcMqwsxFAnkvhBocMN",
-	"TR1C25Xuh1aSfXceB5heILZ9GhNssA819Kltqb4KsSAXHpKHAXnnlu6Adp6ryim2tl3d8c24L3wPD2xZ",
-	"vGdP69d7u3Fz4bmdfxyWugBTb9fA1Lx8+E77ws6dLZO3gNhKOPKXE8iR+iXQp3ms6QRo0W4pEmMP9tLz",
-	"cMYpWYXb3+//CgAA///1vThldQgAAA==",
+	"H4sIAAAAAAAC/6xWTW8bRwz9K8S0QC8bSanbi25G2wRCDhXi3AIf6Flqd+LVzIbkWBEC/feCsyvJsuTC",
+	"+bitZpdvHh8fSX11Pq37FCmquPlXxyR9ikLlx1uKxNj9w5z4/fjCzn2KSlHtEfu+Cx41pDj9JCnamfiW",
+	"1mhPPaeeWMMAV5Ni6MZH8Rx6C3Nzt8qsLTGMH1RQ011umhAbCHGVeF3wXeV025ObO1EOsXG7yq1JBBs6",
+	"h9SWgIw37D85i94dTtLdJ/LqdnZ0CoPQDBqMYEUeiVSihXzmoNsby3dI8cabGO9oe521tYNgKC1hTewq",
+	"F3Ft99348Bfqq+vl4tU72h6ZYR/sd+FhiZ+n9Z5E4Xq5gFVisBzfdukuC3xgjLIihhvih+BpAguFLCQw",
+	"MAJN9xSlhGHWlqKOVZvY9UE7u/8ZMLvQVe6BWAYWryezyczkTz1F7IObu6vJbHLlKtejtkWJqY4oxQdJ",
+	"9DyZhQJ2XdoMtJg+ZxK1ou9DQVHuBbDBEEUBYRBuSOaYoukgI1X0PuWo4FNchSYz1bAJ2j7+5jcBg8Po",
+	"zRRm0CLEonZzt0yi+/Q/oNyXjBjXpMTi5h/Hgn7OxNtjPSVl9vQGfeiC2rnlEphqN1fOVD3qiCfGH0NA",
+	"k6UCKDBgXXLr/929RG2/4d6iRgkEKxikWAQ60GkGI/gUI3ktwhX/vpBTTaI/R426OOKZ9n9WkmL5Zai/",
+	"UZHRXcvF35BWRZAaFYUU7uixLQ3unMxtdTo8f5/NfmBWmvPNkZd42jsI9Z7kSbeAtqiwQQHPhHqR6YU5",
+	"J9l7ElnlrtuCKLJSDXgKbQ3/xw8l9ey0bsIDCezXQEH/omUqrDB0memFWaQ1aWul2lBU2HCyx337jwOm",
+	"giwZLc86k1nNooC+KHHE7jBIJDQRu87AMA7TfxDgtdH/lWnl5u6X6XF7Tg/Vn17cmyX46vuD/xyk/55g",
+	"21V5vUbeurkbZTirbuUUG5tx7jC5b3eP11wZf08W3Mdb8/0Y+LSq/+5HqwBTZ2Y0uU/Xz7Fr7dxZS78E",
+	"xBrzwF+OIAfq50BvRnelI6AZbL/fT/9ojHDJItzudvdfAAAA///XM6zWJwkAAA==",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file

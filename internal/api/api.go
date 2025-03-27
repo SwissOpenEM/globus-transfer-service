@@ -1,10 +1,15 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"reflect"
+	"slices"
+	"text/template"
 
 	"github.com/SwissOpenEM/globus"
+	"github.com/gin-gonic/gin"
 )
 
 //go:generate go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen --config=cfg.yaml openapi.yaml
@@ -12,27 +17,39 @@ import (
 type ServerHandler struct {
 	globusClient          globus.GlobusClient
 	facilityCollectionIDs map[string]string
+	groupTemplate         *template.Template
 }
 
 var _ StrictServerInterface = ServerHandler{}
 
-func NewServerHandler(clientID string, clientSecret string, scopes []string, facilityCollectionIDs map[string]string) (ServerHandler, error) {
+func NewServerHandler(clientID string, clientSecret string, scopes []string, facilityCollectionIDs map[string]string, accessGroupTemplate string) (ServerHandler, error) {
 	// create server with service client
 	var err error
 	globusClient, err := globus.AuthCreateServiceClient(context.Background(), clientID, clientSecret, scopes)
 	if err != nil {
 		return ServerHandler{}, err
 	}
+
 	if !globusClient.IsClientSet() {
 		return ServerHandler{}, fmt.Errorf("AUTH error: Client is nil")
 	}
+
+	groupTemplate, err := template.New("group templater").Parse(accessGroupTemplate)
+	if err != nil {
+		return ServerHandler{}, err
+	}
+
 	return ServerHandler{
 		globusClient:          globusClient,
 		facilityCollectionIDs: facilityCollectionIDs,
+		groupTemplate:         groupTemplate,
 	}, err
 }
 
 func (s ServerHandler) PostTransferTask(ctx context.Context, request PostTransferTaskRequestObject) (PostTransferTaskResponseObject, error) {
+	ginCtx := ctx.(*gin.Context)
+
+	// check facility id's and fetch collection id's
 	sourceCollectionID, ok := s.facilityCollectionIDs[request.Params.SourceFacility]
 	if !ok {
 		return PostTransferTask403JSONResponse{
@@ -46,6 +63,58 @@ func (s ServerHandler) PostTransferTask(ctx context.Context, request PostTransfe
 		}, nil
 	}
 
+	u, ok := ginCtx.Get("scicatUser")
+	if !ok {
+		return PostTransferTask500JSONResponse{
+			Message: getPointerOrNil("no user was found"),
+		}, nil
+	}
+
+	// check for required user access groups
+	scicatUser, ok := u.(User)
+	if !ok {
+		return PostTransferTask500JSONResponse{
+			Message: getPointerOrNil("invalid user in context"),
+			Details: getPointerOrNil(fmt.Sprintf("type found: '%s'", reflect.TypeOf(u))),
+		}, nil
+	}
+
+	var srcGroupBuf bytes.Buffer
+	err := s.groupTemplate.Execute(&srcGroupBuf, GroupTemplateData{FacilityName: request.Params.SourceFacility})
+	if err != nil {
+		return PostTransferTask500JSONResponse{
+			Message: getPointerOrNil("group templating failed with source facility"),
+			Details: getPointerOrNil(err.Error()),
+		}, nil
+	}
+
+	var destGroupBuf bytes.Buffer
+	err = s.groupTemplate.Execute(&destGroupBuf, GroupTemplateData{FacilityName: request.Params.DestFacility})
+	if err != nil {
+		return PostTransferTask500JSONResponse{
+			Message: getPointerOrNil("group templating failed with destination facility"),
+			Details: getPointerOrNil(err.Error()),
+		}, nil
+	}
+
+	requiredGroups := []string{srcGroupBuf.String(), destGroupBuf.String()}
+	missingGroups := []string{}
+	for _, group := range requiredGroups {
+		if !slices.Contains(scicatUser.Profile.AccessGroups, group) {
+			missingGroups = append(missingGroups, group)
+		}
+	}
+
+	if len(missingGroups) > 0 {
+		return PostTransferTask401JSONResponse{
+			GeneralErrorResponseJSONResponse: GeneralErrorResponseJSONResponse{
+				Message: getPointerOrNil("you don't have the required access groups to request this transfer"),
+				Details: getPointerOrNil(fmt.Sprintf("missing groups: '%v'", missingGroups)),
+			},
+		}, nil
+	}
+
+	// request the transfer
 	sourcePath := request.Params.SourcePath
 	destPath := "/" + request.Params.ScicatPid
 	_ = destPath
@@ -64,6 +133,7 @@ func (s ServerHandler) PostTransferTask(ctx context.Context, request PostTransfe
 		}, nil
 	}
 
+	// return response
 	return PostTransferTask200JSONResponse{
 		TaskId: getPointerOrNil(result.TaskId),
 	}, nil

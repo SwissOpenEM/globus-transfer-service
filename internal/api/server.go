@@ -15,7 +15,7 @@ import (
 //go:embed openapi.yaml
 var swaggerYAML embed.FS
 
-func NewServer(api *ServerHandler, port uint) (*http.Server, error) {
+func NewServer(api *ServerHandler, port uint, scicatUrl string) (*http.Server, error) {
 	r := gin.New()
 
 	// TODO: get the openapi.yaml embedded somehow
@@ -24,6 +24,10 @@ func NewServer(api *ServerHandler, port uint) (*http.Server, error) {
 	})
 
 	r.GET("/docs/*any", ginSwagger.WrapHandler(swaggerfiles.Handler, ginSwagger.URL("/openapi.yaml")))
+
+	r.Use(
+		ScicatTokenAuthMiddleware(scicatUrl),
+	)
 
 	RegisterHandlers(r, NewStrictHandler(api, []StrictMiddlewareFunc{}))
 
