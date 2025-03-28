@@ -22,24 +22,21 @@ paths:
       operationId: PostTransferTask
       parameters:
         - name: sourceFacility
+          description: "the identifier name of the source facility"
           in: query
           required: true
           schema:
             type: string
             description: facility to use as source
-        - name: sourcePath
-          in: query
-          required: true
-          schema:
-            type: string
-            description: the source path on the facility globus connect server
         - name: destFacility
+          description: "the path in the destination collection to use for the transfer"
           in: query
           required: true
           schema:
             type: string
             description: facility to use as destination
         - name: scicatPid
+          description: "the pid of the dataset being transferred"
           in: query
           required: true
           schema:
@@ -57,13 +54,7 @@ paths:
                     description: the task id of the transfer task that was created
         "400":
           description: something went wrong with the request, usually due to some external service signalling an error
-          content:
-            application/json:
-              schema:
-                properties:
-                  message:
-                    type: string
-                    description: gives further context for failure
+          $ref: "#/components/responses/GeneralErrorResponse"
         "401":
           description: the user does not have a valid auth session, so the request is rejected
           $ref: "#/components/responses/GeneralErrorResponse"

@@ -48,11 +48,12 @@ type User struct {
 		} `json:"oidcClaims"`
 		ID_ string `json:"_id"`
 	} `json:"profile"`
-	Provider string    `json:"provider"`
-	UserID   string    `json:"userId"`
-	Created  time.Time `json:"created"`
-	Modified time.Time `json:"modified"`
-	V        int       `json:"__v"`
+	Provider    string    `json:"provider"`
+	UserID      string    `json:"userId"`
+	Created     time.Time `json:"created"`
+	Modified    time.Time `json:"modified"`
+	V           int       `json:"__v"`
+	ScicatToken string
 }
 
 type GeneralError struct {
@@ -115,6 +116,7 @@ func ScicatTokenAuthMiddleware(scicatUrl string) gin.HandlerFunc {
 
 		var user User
 		json.Unmarshal(body, &user)
+		user.ScicatToken = scicatApiKey
 		c.Set("scicatUser", user)
 		c.Next()
 	}

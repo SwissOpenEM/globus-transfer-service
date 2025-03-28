@@ -36,10 +36,14 @@ type GeneralErrorResponse struct {
 
 // PostTransferTaskParams defines parameters for PostTransferTask.
 type PostTransferTaskParams struct {
+	// SourceFacility the identifier name of the source facility
 	SourceFacility string `form:"sourceFacility" json:"sourceFacility"`
-	SourcePath     string `form:"sourcePath" json:"sourcePath"`
-	DestFacility   string `form:"destFacility" json:"destFacility"`
-	ScicatPid      string `form:"scicatPid" json:"scicatPid"`
+
+	// DestFacility the path in the destination collection to use for the transfer
+	DestFacility string `form:"destFacility" json:"destFacility"`
+
+	// ScicatPid the pid of the dataset being transferred
+	ScicatPid string `form:"scicatPid" json:"scicatPid"`
 }
 
 // ServerInterface represents all server handlers.
@@ -80,21 +84,6 @@ func (siw *ServerInterfaceWrapper) PostTransferTask(c *gin.Context) {
 	err = runtime.BindQueryParameter("form", true, true, "sourceFacility", c.Request.URL.Query(), &params.SourceFacility)
 	if err != nil {
 		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter sourceFacility: %w", err), http.StatusBadRequest)
-		return
-	}
-
-	// ------------- Required query parameter "sourcePath" -------------
-
-	if paramValue := c.Query("sourcePath"); paramValue != "" {
-
-	} else {
-		siw.ErrorHandler(c, fmt.Errorf("Query argument sourcePath is required, but not found"), http.StatusBadRequest)
-		return
-	}
-
-	err = runtime.BindQueryParameter("form", true, true, "sourcePath", c.Request.URL.Query(), &params.SourcePath)
-	if err != nil {
-		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter sourcePath: %w", err), http.StatusBadRequest)
 		return
 	}
 
@@ -197,8 +186,7 @@ func (response PostTransferTask200JSONResponse) VisitPostTransferTaskResponse(w 
 }
 
 type PostTransferTask400JSONResponse struct {
-	// Message gives further context for failure
-	Message *string `json:"message,omitempty"`
+	GeneralErrorResponseJSONResponse
 }
 
 func (response PostTransferTask400JSONResponse) VisitPostTransferTaskResponse(w http.ResponseWriter) error {
@@ -209,7 +197,11 @@ func (response PostTransferTask400JSONResponse) VisitPostTransferTaskResponse(w 
 }
 
 type PostTransferTask401JSONResponse struct {
-	GeneralErrorResponseJSONResponse
+	// Details further details, debugging information
+	Details *string `json:"details,omitempty"`
+
+	// Message the error message
+	Message *string `json:"message,omitempty"`
 }
 
 func (response PostTransferTask401JSONResponse) VisitPostTransferTaskResponse(w http.ResponseWriter) error {
@@ -298,20 +290,19 @@ func (sh *strictHandler) PostTransferTask(ctx *gin.Context, params PostTransferT
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"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",
+	"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",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file

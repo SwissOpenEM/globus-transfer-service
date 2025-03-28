@@ -3,7 +3,11 @@ package api
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
+	"net/url"
 	"reflect"
 	"slices"
 	"text/template"
@@ -12,18 +16,24 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-//go:generate go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen --config=cfg.yaml openapi.yaml
+//go:generate oapi-codegen --config=cfg.yaml openapi.yaml
 
 type ServerHandler struct {
 	globusClient          globus.GlobusClient
 	facilityCollectionIDs map[string]string
 	srcGroupTemplate      *template.Template
 	dstGroupTemplate      *template.Template
+	scicatUrl             string
+}
+
+type ScicatDataset struct {
+	OwnerGroup   string `json:"ownerGroup"`
+	SourceFolder string `json:"sourceFolder"`
 }
 
 var _ StrictServerInterface = ServerHandler{}
 
-func NewServerHandler(clientID string, clientSecret string, scopes []string, facilityCollectionIDs map[string]string, srcGroupTemplate string, dstGroupTemplate string) (ServerHandler, error) {
+func NewServerHandler(clientID string, clientSecret string, scopes []string, facilityCollectionIDs map[string]string, srcGroupTemplate string, dstGroupTemplate string, scicatUrl string) (ServerHandler, error) {
 	// create server with service client
 	var err error
 	globusClient, err := globus.AuthCreateServiceClient(context.Background(), clientID, clientSecret, scopes)
@@ -46,6 +56,7 @@ func NewServerHandler(clientID string, clientSecret string, scopes []string, fac
 	}
 
 	return ServerHandler{
+		scicatUrl:             scicatUrl,
 		globusClient:          globusClient,
 		facilityCollectionIDs: facilityCollectionIDs,
 		srcGroupTemplate:      srcTemplate,
@@ -77,7 +88,7 @@ func (s ServerHandler) PostTransferTask(ctx context.Context, request PostTransfe
 		}, nil
 	}
 
-	// check for required user access groups
+	// fetch scicat user
 	scicatUser, ok := u.(User)
 	if !ok {
 		return PostTransferTask500JSONResponse{
@@ -86,8 +97,63 @@ func (s ServerHandler) PostTransferTask(ctx context.Context, request PostTransfe
 		}, nil
 	}
 
+	// fetch related dataset
+	datasetUrl, err := url.JoinPath(s.scicatUrl, "datasets", request.Params.ScicatPid)
+	if err != nil {
+		return PostTransferTask500JSONResponse{
+			Message: getPointerOrNil("couldn't create dataset request url"),
+			Details: getPointerOrNil(err.Error()),
+		}, nil
+	}
+
+	datasetReq, err := http.NewRequest("GET", datasetUrl, nil)
+	if err != nil {
+		return PostTransferTask500JSONResponse{
+			Message: getPointerOrNil("couldn't generate dataset request"),
+			Details: getPointerOrNil(err.Error()),
+		}, nil
+	}
+	datasetReq.Header.Set("Authorization", "Bearer "+scicatUser.ScicatToken)
+
+	datasetResp, err := http.DefaultClient.Do(datasetReq)
+	if err != nil {
+		return PostTransferTask500JSONResponse{
+			Message: getPointerOrNil("couldn't send dataset request to scicat backend"),
+			Details: getPointerOrNil(err.Error()),
+		}, nil
+	}
+	defer datasetResp.Body.Close()
+
+	if datasetResp.StatusCode != 200 {
+		body, _ := io.ReadAll(datasetResp.Body)
+		return PostTransferTask400JSONResponse{
+			GeneralErrorResponseJSONResponse: GeneralErrorResponseJSONResponse{
+				Message: getPointerOrNil("the dataset with the given pid does not exist or you don't have access rights to it"),
+				Details: getPointerOrNil(fmt.Sprintf("response status '%d', body '%s'", datasetResp.StatusCode, string(body))),
+			},
+		}, nil
+	}
+
+	datasetRespBody, err := io.ReadAll(datasetResp.Body)
+	if err != nil {
+		return PostTransferTask500JSONResponse{
+			Message: getPointerOrNil("failed to read response body"),
+			Details: getPointerOrNil(err.Error()),
+		}, nil
+	}
+
+	var dataset ScicatDataset
+	err = json.Unmarshal(datasetRespBody, &dataset)
+	if err != nil {
+		return PostTransferTask500JSONResponse{
+			Message: getPointerOrNil("failed to unmarshal response body"),
+			Details: getPointerOrNil(err.Error()),
+		}, nil
+	}
+
+	// check for required group memberships
 	var srcGroupBuf bytes.Buffer
-	err := s.srcGroupTemplate.Execute(&srcGroupBuf, GroupTemplateData{FacilityName: request.Params.SourceFacility})
+	err = s.srcGroupTemplate.Execute(&srcGroupBuf, GroupTemplateData{FacilityName: request.Params.SourceFacility})
 	if err != nil {
 		return PostTransferTask500JSONResponse{
 			Message: getPointerOrNil("group templating failed with source facility"),
@@ -104,7 +170,7 @@ func (s ServerHandler) PostTransferTask(ctx context.Context, request PostTransfe
 		}, nil
 	}
 
-	requiredGroups := []string{srcGroupBuf.String(), dstGroupBuf.String()}
+	requiredGroups := []string{srcGroupBuf.String(), dstGroupBuf.String(), dataset.OwnerGroup}
 	missingGroups := []string{}
 	for _, group := range requiredGroups {
 		if !slices.Contains(scicatUser.Profile.AccessGroups, group) {
@@ -114,15 +180,13 @@ func (s ServerHandler) PostTransferTask(ctx context.Context, request PostTransfe
 
 	if len(missingGroups) > 0 {
 		return PostTransferTask401JSONResponse{
-			GeneralErrorResponseJSONResponse: GeneralErrorResponseJSONResponse{
-				Message: getPointerOrNil("you don't have the required access groups to request this transfer"),
-				Details: getPointerOrNil(fmt.Sprintf("missing groups: '%v'", missingGroups)),
-			},
+			Message: getPointerOrNil("you don't have the required access groups to request this transfer"),
+			Details: getPointerOrNil(fmt.Sprintf("missing groups: '%v'", missingGroups)),
 		}, nil
 	}
 
 	// request the transfer
-	sourcePath := request.Params.SourcePath
+	sourcePath := dataset.SourceFolder
 	destPath := "/" + request.Params.ScicatPid
 	_ = destPath
 
@@ -136,7 +200,9 @@ func (s ServerHandler) PostTransferTask(ctx context.Context, request PostTransfe
 	result, err := s.globusClient.TransferFolderSync(sourceCollectionID, sourcePath, destCollectionID, "/service_user/"+request.Params.ScicatPid, false)
 	if err != nil {
 		return PostTransferTask400JSONResponse{
-			Message: getPointerOrNil(fmt.Sprintf("transfer request failed: %s", err.Error())),
+			GeneralErrorResponseJSONResponse: GeneralErrorResponseJSONResponse{
+				Message: getPointerOrNil(fmt.Sprintf("transfer request failed: %s", err.Error())),
+			},
 		}, nil
 	}
 
