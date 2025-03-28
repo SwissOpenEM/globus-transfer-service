@@ -17,7 +17,7 @@ func main() {
 		log.Fatalf("couldn't read config: %s", err.Error())
 	}
 
-	serverHandler, err := api.NewServerHandler(globusClientId, globusClientSecret, conf.GlobusScopes, conf.FacilityCollectionIDs, conf.FacilitySrcGroupTemplate, conf.FacilityDstGroupTemplate)
+	serverHandler, err := api.NewServerHandler(globusClientId, globusClientSecret, conf.GlobusScopes, conf.FacilityCollectionIDs, conf.FacilitySrcGroupTemplate, conf.FacilityDstGroupTemplate, conf.ScicatUrl)
 	if err != nil {
 		log.Fatal(err)
 	}
