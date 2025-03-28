@@ -42,6 +42,20 @@ paths:
           schema:
             type: string
             description: the SciCat PID of the dataset being transferred
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                fileList:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/FileToTransfer"
+              required:
+                - fileList
+
       responses: 
         "200":
           description: successfully started a transfer task
@@ -94,7 +108,20 @@ components:
       required:
         - transferId
         - status
-  
+    FileToTransfer:
+      description: the file to transfer as part of a transfer request
+      type: object
+      properties:
+        path:
+          type: string
+          description: the path of the file, it has to be relative to the dataset source folder 
+        isSymlink:
+          type: boolean
+          description: specifies whether this file is a symlink
+      required:
+        - path
+        - isSymlink
+
   responses:
     GeneralErrorResponse:
       description: a general error resposne

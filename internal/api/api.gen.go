@@ -25,6 +25,15 @@ const (
 	ScicatKeyAuthScopes = "ScicatKeyAuth.Scopes"
 )
 
+// FileToTransfer the file to transfer as part of a transfer request
+type FileToTransfer struct {
+	// IsSymlink specifies whether this file is a symlink
+	IsSymlink bool `json:"isSymlink"`
+
+	// Path the path of the file, it has to be relative to the dataset source folder
+	Path string `json:"path"`
+}
+
 // GeneralErrorResponse defines model for GeneralErrorResponse.
 type GeneralErrorResponse struct {
 	// Details further details, debugging information
@@ -32,6 +41,11 @@ type GeneralErrorResponse struct {
 
 	// Message the error message
 	Message *string `json:"message,omitempty"`
+}
+
+// PostTransferTaskJSONBody defines parameters for PostTransferTask.
+type PostTransferTaskJSONBody struct {
+	FileList []FileToTransfer `json:"fileList"`
 }
 
 // PostTransferTaskParams defines parameters for PostTransferTask.
@@ -45,6 +59,9 @@ type PostTransferTaskParams struct {
 	// ScicatPid the pid of the dataset being transferred
 	ScicatPid string `form:"scicatPid" json:"scicatPid"`
 }
+
+// PostTransferTaskJSONRequestBody defines body for PostTransferTask for application/json ContentType.
+type PostTransferTaskJSONRequestBody PostTransferTaskJSONBody
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
@@ -167,6 +184,7 @@ type GeneralErrorResponseJSONResponse struct {
 
 type PostTransferTaskRequestObject struct {
 	Params PostTransferTaskParams
+	Body   *PostTransferTaskJSONRequestBody
 }
 
 type PostTransferTaskResponseObject interface {
@@ -266,6 +284,14 @@ func (sh *strictHandler) PostTransferTask(ctx *gin.Context, params PostTransferT
 
 	request.Params = params
 
+	var body PostTransferTaskJSONRequestBody
+	if err := ctx.ShouldBindJSON(&body); err != nil {
+		ctx.Status(http.StatusBadRequest)
+		ctx.Error(err)
+		return
+	}
+	request.Body = &body
+
 	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
 		return sh.ssi.PostTransferTask(ctx, request.(PostTransferTaskRequestObject))
 	}
@@ -290,19 +316,22 @@ func (sh *strictHandler) PostTransferTask(ctx *gin.Context, params PostTransferT
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"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",
+	"H4sIAAAAAAAC/6xWTW/bRhD9K4NtgV4Uyanbi27uhwMhBWrEvhk+jJZDcWNyl9kZ2iAC/fdidklRlmgg",
+	"jXMjlzsf782bGX41NjRt8OSFzfqricRt8Ezp5QN5ilj/HWOIn4YPem6DF/Kij9i2tbMoLvjVZw5ez9hW",
+	"1KA+tTG0FMVldwUJunp4ZBtdq2ZmbcouSkURhgsLKGjb7XbO78D5MsQm+TcLI31LZm1YovM7s1+Yhphx",
+	"R+cupSIgzRvGK2fW+8NJ2H4mK2avRy/dIOwyB4OzRA97StYZZ8Jz7Wq6C3cRPZcU59MpXU0gAWS4BcjQ",
+	"YhQIJeB0GulLRyxmccKe49u+qZ1/PPfOLVlXOmJ4rigxKZXjHNAxIPBgeUC8DaEm9Ephi1LNJ6xfNLkx",
+	"+QU4gQpZQWwJItUo7iljqggKFGQS4NBFS1CGuqA4S7tCdJEKs77P4RdH6B7Oy7IwTLaLTvpbpTzzcWtV",
+	"dx+pv+oyAKd5V4Q5qsdGfdxa9yfKu6ubzbuP1E/ZYOv0PZVcNXbOwCdigaubDZQhJnwf6rDtGMYiwy3F",
+	"J2dpCRuBjokhZwQSHslzMsNOKvIyNMhSwzupNf4rzjSgWZgnipyzeL+8WF5omUJLHltn1uZyebG8NLlw",
+	"iYmVHOmuDSznYDYCWNfhOac1SEz76yA7QX5kwB06zwIImbgMZoKoPPCQKlobOi9ggy/drotUwLOT6vjO",
+	"LwzqDr3V/lM1JyI2hVmbm8Aywr9DfkyIIjYkFNms7+cU6Qpls3QUQes7inNUHFpXO9EqJy186Sj2kxTy",
+	"revp0iRDiR0tjubWyXgaTFToHZP2bfY1J+5XG8n53CWJ+EQD2FDXZNPj4HrU2qGi81DUyY8BcpTON6Nx",
+	"xUj82PJbOtaSZvJKCVKH3LjifyStcQYx3mz++pbIpygecjBi+SMU/RsWmA7Bf1zuLyfUpMOfI5VmbX5a",
+	"TYt0NWyG1clamDYOxoj92Sw8+J+Zgfnu0XL+9eLiDVC03bUN59jWbzAV+cWIAKlQ4BkZbCSUWb5n9ih3",
+	"1hJz2dV1DywYhYrjpaeulZ7fMqg5Tg/gV7O/Jcn4/VuML7/f+PfvT1uXW9c0GHuzHmV6xszCCO50KJrD",
+	"YHjYH+/FNC9PNuL9gyp/MDyt87/jLOa8x6nQofByX019q+fmfBrMO9HWPOTPkxOZ2uDU0fXwAxgmhzoJ",
+	"x3+vlz+Bg7ugFmb/sP8vAAD//4/8JI3DCgAA",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file

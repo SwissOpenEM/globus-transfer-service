@@ -190,14 +190,20 @@ func (s ServerHandler) PostTransferTask(ctx context.Context, request PostTransfe
 	destPath := "/" + request.Params.ScicatPid
 	_ = destPath
 
-	/*result, err := s.globusClient.TransferFileList(sourceCollectionID, sourcePath, destCollectionID, destPath, []string{}, []bool{}, false)
-	if err != nil {
-		return TransferPostJob400JSONResponse{
-			Message: getPointerOrNil(fmt.Sprintf("transfer request failed: %s", err.Error())),
-		}, nil
-	}*/
-
-	result, err := s.globusClient.TransferFolderSync(sourceCollectionID, sourcePath, destCollectionID, "/service_user/"+request.Params.ScicatPid, false)
+	var result globus.TransferResult
+	if request.Body != nil {
+		// use filelist
+		paths := make([]string, len(request.Body.FileList))
+		isSymlinks := make([]bool, len(request.Body.FileList))
+		for i, file := range request.Body.FileList {
+			paths[i] = file.Path
+			isSymlinks[i] = file.IsSymlink
+		}
+		result, err = s.globusClient.TransferFileList(sourceCollectionID, sourcePath, destCollectionID, destPath, paths, isSymlinks, false)
+	} else {
+		// sync folders through globus
+		result, err = s.globusClient.TransferFolderSync(sourceCollectionID, sourcePath, destCollectionID, "/service_user/"+request.Params.ScicatPid, false)
+	}
 	if err != nil {
 		return PostTransferTask400JSONResponse{
 			GeneralErrorResponseJSONResponse: GeneralErrorResponseJSONResponse{
