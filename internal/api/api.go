@@ -17,12 +17,13 @@ import (
 type ServerHandler struct {
 	globusClient          globus.GlobusClient
 	facilityCollectionIDs map[string]string
-	groupTemplate         *template.Template
+	srcGroupTemplate      *template.Template
+	dstGroupTemplate      *template.Template
 }
 
 var _ StrictServerInterface = ServerHandler{}
 
-func NewServerHandler(clientID string, clientSecret string, scopes []string, facilityCollectionIDs map[string]string, accessGroupTemplate string) (ServerHandler, error) {
+func NewServerHandler(clientID string, clientSecret string, scopes []string, facilityCollectionIDs map[string]string, srcGroupTemplate string, dstGroupTemplate string) (ServerHandler, error) {
 	// create server with service client
 	var err error
 	globusClient, err := globus.AuthCreateServiceClient(context.Background(), clientID, clientSecret, scopes)
@@ -34,7 +35,12 @@ func NewServerHandler(clientID string, clientSecret string, scopes []string, fac
 		return ServerHandler{}, fmt.Errorf("AUTH error: Client is nil")
 	}
 
-	groupTemplate, err := template.New("group templater").Parse(accessGroupTemplate)
+	srcTemplate, err := template.New("source group template").Parse(srcGroupTemplate)
+	if err != nil {
+		return ServerHandler{}, err
+	}
+
+	dstTemplate, err := template.New("destination group template").Parse(dstGroupTemplate)
 	if err != nil {
 		return ServerHandler{}, err
 	}
@@ -42,7 +48,8 @@ func NewServerHandler(clientID string, clientSecret string, scopes []string, fac
 	return ServerHandler{
 		globusClient:          globusClient,
 		facilityCollectionIDs: facilityCollectionIDs,
-		groupTemplate:         groupTemplate,
+		srcGroupTemplate:      srcTemplate,
+		dstGroupTemplate:      dstTemplate,
 	}, err
 }
 
@@ -80,7 +87,7 @@ func (s ServerHandler) PostTransferTask(ctx context.Context, request PostTransfe
 	}
 
 	var srcGroupBuf bytes.Buffer
-	err := s.groupTemplate.Execute(&srcGroupBuf, GroupTemplateData{FacilityName: request.Params.SourceFacility})
+	err := s.srcGroupTemplate.Execute(&srcGroupBuf, GroupTemplateData{FacilityName: request.Params.SourceFacility})
 	if err != nil {
 		return PostTransferTask500JSONResponse{
 			Message: getPointerOrNil("group templating failed with source facility"),
@@ -88,8 +95,8 @@ func (s ServerHandler) PostTransferTask(ctx context.Context, request PostTransfe
 		}, nil
 	}
 
-	var destGroupBuf bytes.Buffer
-	err = s.groupTemplate.Execute(&destGroupBuf, GroupTemplateData{FacilityName: request.Params.DestFacility})
+	var dstGroupBuf bytes.Buffer
+	err = s.dstGroupTemplate.Execute(&dstGroupBuf, GroupTemplateData{FacilityName: request.Params.DestFacility})
 	if err != nil {
 		return PostTransferTask500JSONResponse{
 			Message: getPointerOrNil("group templating failed with destination facility"),
@@ -97,7 +104,7 @@ func (s ServerHandler) PostTransferTask(ctx context.Context, request PostTransfe
 		}, nil
 	}
 
-	requiredGroups := []string{srcGroupBuf.String(), destGroupBuf.String()}
+	requiredGroups := []string{srcGroupBuf.String(), dstGroupBuf.String()}
 	missingGroups := []string{}
 	for _, group := range requiredGroups {
 		if !slices.Contains(scicatUser.Profile.AccessGroups, group) {

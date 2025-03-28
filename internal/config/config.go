@@ -9,11 +9,12 @@ import (
 )
 
 type Config struct {
-	ScicatUrl                   string            `yaml:"scicatUrl"`
-	FacilityCollectionIDs       map[string]string `yaml:"facilityCollectionIDs"`
-	GlobusScopes                []string          `yaml:"globusScopes"`
-	Port                        uint              `yaml:"port"`
-	FacilityAccessGroupTemplate string            `yaml:"facilityAccessGroupTemplate"`
+	ScicatUrl                string            `yaml:"scicatUrl"`
+	FacilityCollectionIDs    map[string]string `yaml:"facilityCollectionIDs"`
+	GlobusScopes             []string          `yaml:"globusScopes"`
+	Port                     uint              `yaml:"port"`
+	FacilitySrcGroupTemplate string            `yaml:"facilitySrcGroupTemplate"`
+	FacilityDstGroupTemplate string            `yaml:"facilityDstGroupTemplate"`
 }
 
 const confFileName string = "globus-transfer-service-conf.yaml"

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"path"
+	"net/url"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -68,13 +68,22 @@ func ScicatTokenAuthMiddleware(scicatUrl string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		scicatApiKey := c.Request.Header.Get("SciCat-API-Key")
 
-		userIdentityUrl := path.Join(scicatUrl, "users", "my", "identity")
+		userIdentityUrl, err := url.JoinPath(scicatUrl, "users", "my", "identity")
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusInternalServerError, GeneralError{
+				Message: "couldn't create request url for scicat token verification request",
+				Details: err.Error(),
+			})
+			return
+		}
+
 		req, err := http.NewRequest("GET", userIdentityUrl, nil)
 		if err != nil {
 			c.AbortWithStatusJSON(http.StatusInternalServerError, GeneralError{
 				Message: fmt.Sprintf("couldn't create GET request using the path '%s'", userIdentityUrl),
 				Details: err.Error(),
 			})
+			return
 		}
 
 		req.Header.Set("Authorization", "Bearer "+scicatApiKey)
@@ -85,6 +94,7 @@ func ScicatTokenAuthMiddleware(scicatUrl string) gin.HandlerFunc {
 				Message: "couldn't make the http request to verify token validity",
 				Details: err.Error(),
 			})
+			return
 		}
 		defer resp.Body.Close()
 
@@ -94,11 +104,13 @@ func ScicatTokenAuthMiddleware(scicatUrl string) gin.HandlerFunc {
 				Message: "the access token provided with the request is invalid",
 				Details: fmt.Sprintf("status: '%d', body: '%s'", resp.StatusCode, string(body)),
 			})
+			return
 		}
 
 		body, err := io.ReadAll(resp.Body)
 		if err != nil {
 			c.AbortWithStatusJSON(http.StatusInternalServerError, GeneralError{})
+			return
 		}
 
 		var user User
