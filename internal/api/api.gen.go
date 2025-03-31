@@ -45,7 +45,7 @@ type GeneralErrorResponse struct {
 
 // PostTransferTaskJSONBody defines parameters for PostTransferTask.
 type PostTransferTaskJSONBody struct {
-	FileList []FileToTransfer `json:"fileList"`
+	FileList *[]FileToTransfer `json:"fileList,omitempty"`
 }
 
 // PostTransferTaskParams defines parameters for PostTransferTask.
@@ -328,10 +328,10 @@ var swaggerSpec = []string{
 	"LwzqDr3V/lM1JyI2hVmbm8Aywr9DfkyIIjYkFNms7+cU6Qpls3QUQes7inNUHFpXO9EqJy186Sj2kxTy",
 	"revp0iRDiR0tjubWyXgaTFToHZP2bfY1J+5XG8n53CWJ+EQD2FDXZNPj4HrU2qGi81DUyY8BcpTON6Nx",
 	"xUj82PJbOtaSZvJKCVKH3LjifyStcQYx3mz++pbIpygecjBi+SMU/RsWmA7Bf1zuLyfUpMOfI5VmbX5a",
-	"TYt0NWyG1clamDYOxoj92Sw8+J+Zgfnu0XL+9eLiDVC03bUN59jWbzAV+cWIAKlQ4BkZbCSUWb5n9ih3",
-	"1hJz2dV1DywYhYrjpaeulZ7fMqg5Tg/gV7O/Jcn4/VuML7/f+PfvT1uXW9c0GHuzHmV6xszCCO50KJrD",
-	"YHjYH+/FNC9PNuL9gyp/MDyt87/jLOa8x6nQofByX019q+fmfBrMO9HWPOTPkxOZ2uDU0fXwAxgmhzoJ",
-	"x3+vlz+Bg7ugFmb/sP8vAAD//4/8JI3DCgAA",
+	"TYt0NWyG1clamDYOxoj9/ApK8/FoCf96cfGGlLWttd3mWNVvMBXzxSgAqVDgGRlsJJRZXmf2JXfWEnPZ",
+	"1XUPLBiFiuPlpq6Vht8yqDnuDuBXs78fyfj9W4wvv9/49+9PW5dY1zQYe7Me5XjGzMII7nT4mcMAeNgf",
+	"7780F0823/2DKnwwPK3zv+PM5byvqdDmf7mXpv7Uc3Pe9fNOtAUP+fPkRCa5nzq6Hn70wuRQJ974j/Xy",
+	"Z29wF9TC7B/2/wUAAP//410OuqsKAAA=",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file

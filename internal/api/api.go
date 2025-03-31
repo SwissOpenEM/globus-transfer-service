@@ -98,7 +98,7 @@ func (s ServerHandler) PostTransferTask(ctx context.Context, request PostTransfe
 	}
 
 	// fetch related dataset
-	datasetUrl, err := url.JoinPath(s.scicatUrl, "datasets", request.Params.ScicatPid)
+	datasetUrl, err := url.JoinPath(s.scicatUrl, "datasets", url.QueryEscape(request.Params.ScicatPid))
 	if err != nil {
 		return PostTransferTask500JSONResponse{
 			Message: getPointerOrNil("couldn't create dataset request url"),
@@ -191,11 +191,19 @@ func (s ServerHandler) PostTransferTask(ctx context.Context, request PostTransfe
 	_ = destPath
 
 	var result globus.TransferResult
-	if request.Body != nil {
+	if request.Body == nil {
+		return PostTransferTask400JSONResponse{
+			GeneralErrorResponseJSONResponse: GeneralErrorResponseJSONResponse{
+				Message: getPointerOrNil("no body was sent with the request"),
+			},
+		}, nil
+	}
+
+	if request.Body.FileList != nil {
 		// use filelist
-		paths := make([]string, len(request.Body.FileList))
-		isSymlinks := make([]bool, len(request.Body.FileList))
-		for i, file := range request.Body.FileList {
+		paths := make([]string, len(*request.Body.FileList))
+		isSymlinks := make([]bool, len(*request.Body.FileList))
+		for i, file := range *request.Body.FileList {
 			paths[i] = file.Path
 			isSymlinks[i] = file.IsSymlink
 		}
@@ -204,6 +212,7 @@ func (s ServerHandler) PostTransferTask(ctx context.Context, request PostTransfe
 		// sync folders through globus
 		result, err = s.globusClient.TransferFolderSync(sourceCollectionID, sourcePath, destCollectionID, "/service_user/"+request.Params.ScicatPid, false)
 	}
+
 	if err != nil {
 		return PostTransferTask400JSONResponse{
 			GeneralErrorResponseJSONResponse: GeneralErrorResponseJSONResponse{
