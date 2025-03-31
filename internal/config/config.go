@@ -15,6 +15,7 @@ type Config struct {
 	Port                     uint              `yaml:"port"`
 	FacilitySrcGroupTemplate string            `yaml:"facilitySrcGroupTemplate"`
 	FacilityDstGroupTemplate string            `yaml:"facilityDstGroupTemplate"`
+	DstPathTemplate          string            `yaml:"destinationPathTemplate"`
 }
 
 const confFileName string = "globus-transfer-service-conf.yaml"

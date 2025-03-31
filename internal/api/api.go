@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"path"
 	"reflect"
 	"slices"
 	"text/template"
@@ -20,10 +21,11 @@ import (
 
 type ServerHandler struct {
 	globusClient          globus.GlobusClient
+	scicatUrl             string
 	facilityCollectionIDs map[string]string
 	srcGroupTemplate      *template.Template
 	dstGroupTemplate      *template.Template
-	scicatUrl             string
+	dstPathTemplate       DestinationTemplate
 }
 
 type ScicatDataset struct {
@@ -33,7 +35,7 @@ type ScicatDataset struct {
 
 var _ StrictServerInterface = ServerHandler{}
 
-func NewServerHandler(clientID string, clientSecret string, scopes []string, facilityCollectionIDs map[string]string, srcGroupTemplate string, dstGroupTemplate string, scicatUrl string) (ServerHandler, error) {
+func NewServerHandler(clientID string, clientSecret string, scopes []string, scicatUrl string, facilityCollectionIDs map[string]string, srcGroupTemplateBody string, dstGroupTemplateBody string, dstPathTemplateBody string) (ServerHandler, error) {
 	// create server with service client
 	var err error
 	globusClient, err := globus.AuthCreateServiceClient(context.Background(), clientID, clientSecret, scopes)
@@ -45,12 +47,17 @@ func NewServerHandler(clientID string, clientSecret string, scopes []string, fac
 		return ServerHandler{}, fmt.Errorf("AUTH error: Client is nil")
 	}
 
-	srcTemplate, err := template.New("source group template").Parse(srcGroupTemplate)
+	srcGroupTemplate, err := template.New("source group template").Parse(srcGroupTemplateBody)
 	if err != nil {
 		return ServerHandler{}, err
 	}
 
-	dstTemplate, err := template.New("destination group template").Parse(dstGroupTemplate)
+	dstGroupTemplate, err := template.New("destination group template").Parse(dstGroupTemplateBody)
+	if err != nil {
+		return ServerHandler{}, err
+	}
+
+	dstPathTemplate, err := NewDestinationTemplate(dstPathTemplateBody)
 	if err != nil {
 		return ServerHandler{}, err
 	}
@@ -59,8 +66,9 @@ func NewServerHandler(clientID string, clientSecret string, scopes []string, fac
 		scicatUrl:             scicatUrl,
 		globusClient:          globusClient,
 		facilityCollectionIDs: facilityCollectionIDs,
-		srcGroupTemplate:      srcTemplate,
-		dstGroupTemplate:      dstTemplate,
+		srcGroupTemplate:      srcGroupTemplate,
+		dstGroupTemplate:      dstGroupTemplate,
+		dstPathTemplate:       dstPathTemplate,
 	}, err
 }
 
@@ -186,9 +194,24 @@ func (s ServerHandler) PostTransferTask(ctx context.Context, request PostTransfe
 	}
 
 	// request the transfer
+	params := destPathParams{
+		DatasetFolder: path.Base(dataset.SourceFolder),
+		SourceFolder:  dataset.SourceFolder,
+		Pid:           request.Params.ScicatPid,
+		PidShort:      path.Base(request.Params.ScicatPid),
+		PidPrefix:     path.Dir(request.Params.ScicatPid),
+		PidEncoded:    url.PathEscape(request.Params.ScicatPid),
+		Username:      scicatUser.Profile.Username,
+	}
+
 	sourcePath := dataset.SourceFolder
-	destPath := "/" + request.Params.ScicatPid
-	_ = destPath
+	destPath, err := s.dstPathTemplate.Execute(params)
+	if err != nil {
+		return PostTransferTask500JSONResponse{
+			Message: getPointerOrNil("couldn't template destination folder for the transfer"),
+			Details: getPointerOrNil(err.Error()),
+		}, nil
+	}
 
 	var result globus.TransferResult
 	if request.Body == nil {
@@ -210,7 +233,7 @@ func (s ServerHandler) PostTransferTask(ctx context.Context, request PostTransfe
 		result, err = s.globusClient.TransferFileList(sourceCollectionID, sourcePath, destCollectionID, destPath, paths, isSymlinks, false)
 	} else {
 		// sync folders through globus
-		result, err = s.globusClient.TransferFolderSync(sourceCollectionID, sourcePath, destCollectionID, "/service_user/"+request.Params.ScicatPid, false)
+		result, err = s.globusClient.TransferFolderSync(sourceCollectionID, sourcePath, destCollectionID, destPath, false)
 	}
 
 	if err != nil {
