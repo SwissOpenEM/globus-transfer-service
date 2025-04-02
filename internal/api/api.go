@@ -242,6 +242,8 @@ func (s ServerHandler) PostTransferTask(ctx context.Context, request PostTransfe
 		}, nil
 	}
 
+	s.taskPool.AddTransferTask(result.TaskId, request.Params.ScicatPid)
+
 	// return response
 	return PostTransferTask200JSONResponse{
 		TaskId: getPointerOrNil(result.TaskId),
