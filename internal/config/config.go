@@ -16,6 +16,11 @@ type Config struct {
 	FacilitySrcGroupTemplate string            `yaml:"facilitySrcGroupTemplate"`
 	FacilityDstGroupTemplate string            `yaml:"facilityDstGroupTemplate"`
 	DstPathTemplate          string            `yaml:"destinationPathTemplate"`
+	Task                     struct {
+		MaxConcurrency int  `yaml:"maxConcurrency"`
+		QueueSize      int  `yaml:"queueSize"`
+		PollInterval   uint `yaml:"pollInterval"`
+	} `yaml:"task"`
 }
 
 const confFileName string = "globus-transfer-service-conf.yaml"

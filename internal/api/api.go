@@ -14,6 +14,7 @@ import (
 	"text/template"
 
 	"github.com/SwissOpenEM/globus"
+	"github.com/SwissOpenEM/globus-transfer-service/internal/tasks"
 	"github.com/gin-gonic/gin"
 )
 
@@ -26,6 +27,7 @@ type ServerHandler struct {
 	srcGroupTemplate      *template.Template
 	dstGroupTemplate      *template.Template
 	dstPathTemplate       DestinationTemplate
+	taskPool              tasks.TaskPool
 }
 
 type ScicatDataset struct {
@@ -35,14 +37,9 @@ type ScicatDataset struct {
 
 var _ StrictServerInterface = ServerHandler{}
 
-func NewServerHandler(clientID string, clientSecret string, scopes []string, scicatUrl string, facilityCollectionIDs map[string]string, srcGroupTemplateBody string, dstGroupTemplateBody string, dstPathTemplateBody string) (ServerHandler, error) {
+func NewServerHandler(globusClient globus.GlobusClient, scopes []string, scicatUrl string, facilityCollectionIDs map[string]string, srcGroupTemplateBody string, dstGroupTemplateBody string, dstPathTemplateBody string, taskPool tasks.TaskPool) (ServerHandler, error) {
 	// create server with service client
 	var err error
-	globusClient, err := globus.AuthCreateServiceClient(context.Background(), clientID, clientSecret, scopes)
-	if err != nil {
-		return ServerHandler{}, err
-	}
-
 	if !globusClient.IsClientSet() {
 		return ServerHandler{}, fmt.Errorf("AUTH error: Client is nil")
 	}
@@ -69,6 +66,7 @@ func NewServerHandler(clientID string, clientSecret string, scopes []string, sci
 		srcGroupTemplate:      srcGroupTemplate,
 		dstGroupTemplate:      dstGroupTemplate,
 		dstPathTemplate:       dstPathTemplate,
+		taskPool:              taskPool,
 	}, err
 }
 
