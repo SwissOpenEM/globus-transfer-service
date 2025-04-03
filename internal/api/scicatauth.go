@@ -69,7 +69,7 @@ func ScicatTokenAuthMiddleware(scicatUrl string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		scicatApiKey := c.Request.Header.Get("SciCat-API-Key")
 
-		userIdentityUrl, err := url.JoinPath(scicatUrl, "users", "my", "identity")
+		userIdentityUrl, err := url.JoinPath(scicatUrl, "api", "v3", "users", "my", "identity")
 		if err != nil {
 			c.AbortWithStatusJSON(http.StatusInternalServerError, GeneralError{
 				Message: "couldn't create request url for scicat token verification request",

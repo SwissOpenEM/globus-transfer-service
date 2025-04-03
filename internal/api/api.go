@@ -104,7 +104,7 @@ func (s ServerHandler) PostTransferTask(ctx context.Context, request PostTransfe
 	}
 
 	// fetch related dataset
-	datasetUrl, err := url.JoinPath(s.scicatUrl, "datasets", url.QueryEscape(request.Params.ScicatPid))
+	datasetUrl, err := url.JoinPath(s.scicatUrl, "api", "v3", "datasets", url.QueryEscape(request.Params.ScicatPid))
 	if err != nil {
 		return PostTransferTask500JSONResponse{
 			Message: getPointerOrNil("couldn't create dataset request url"),
@@ -220,6 +220,16 @@ func (s ServerHandler) PostTransferTask(ctx context.Context, request PostTransfe
 		}, nil
 	}
 
+	job, err := tasks.CreateGlobusTransferScicatJob(s.scicatUrl, scicatUser.ScicatToken, params.Pid)
+	if err != nil {
+		return PostTransferTask500JSONResponse{
+			Message: getPointerOrNil(
+				fmt.Sprintf("failed creating transfer job in SciCat"),
+			),
+			Details: getPointerOrNil(err.Error()),
+		}, nil
+	}
+
 	if request.Body.FileList != nil {
 		// use filelist
 		paths := make([]string, len(*request.Body.FileList))
@@ -235,6 +245,16 @@ func (s ServerHandler) PostTransferTask(ctx context.Context, request PostTransfe
 	}
 
 	if err != nil {
+		tasks.UpdateGlobusTransferScicatJob(
+			s.scicatUrl,
+			scicatUser.ScicatToken,
+			job.ID,
+			"999",
+			"globus transfer request creation failed",
+			tasks.GlobusTransferScicatJobResultObject{
+				Error: err.Error(),
+			},
+		)
 		return PostTransferTask400JSONResponse{
 			GeneralErrorResponseJSONResponse: GeneralErrorResponseJSONResponse{
 				Message: getPointerOrNil(fmt.Sprintf("transfer request failed: %s", err.Error())),
@@ -242,7 +262,7 @@ func (s ServerHandler) PostTransferTask(ctx context.Context, request PostTransfe
 		}, nil
 	}
 
-	s.taskPool.AddTransferTask(result.TaskId, request.Params.ScicatPid)
+	s.taskPool.AddTransferTask(result.TaskId, request.Params.ScicatPid, job.ID)
 
 	// return response
 	return PostTransferTask200JSONResponse{

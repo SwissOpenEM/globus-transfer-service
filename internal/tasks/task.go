@@ -13,6 +13,7 @@ type transferTask struct {
 	globusClient     globus.GlobusClient
 	globusTaskId     string
 	datasetPid       string
+	scicatJobId      string
 	taskPollInterval time.Duration
 }
 
@@ -23,6 +24,26 @@ func (t transferTask) execute() {
 	for {
 		bytesTransferred, filesTransferred, totalFiles, completed, err = checkTransfer(t.globusClient, t.globusTaskId)
 		updateTaskInScicat(t.globusTaskId, t.datasetPid, bytesTransferred, filesTransferred, totalFiles, completed, err)
+		statusCode := "002"
+		statusMessage := "transferring"
+		if err != nil {
+			statusCode = "998"
+			statusMessage = "an error has occured during task polling, this job is not updated anymore"
+		}
+		// TODO: do something about the token requirement!!
+		UpdateGlobusTransferScicatJob(
+			*t.scicatUrl,
+			"",
+			t.scicatJobId,
+			statusCode,
+			statusMessage, GlobusTransferScicatJobResultObject{
+				BytesTransferred: uint(bytesTransferred),
+				FilesTransferred: uint(filesTransferred),
+				FilesTotal:       uint(totalFiles),
+				Completed:        completed,
+				Error:            err.Error(),
+			},
+		)
 		if completed || (err != nil) {
 			break
 		}
@@ -58,5 +79,9 @@ func checkTransfer(client globus.GlobusClient, globusTaskId string) (bytesTransf
 }
 
 func updateTaskInScicat(globusTaskId string, datasetPid string, bytesTransferred int, filesTransferred int, totalFiles int, completed bool, err error) {
-	log.Printf("'%s' task for '%s' dataset - bytes transferred: %d, files transferred: %d, total files detected: %d, completed %v, error message: '%s'\n", globusTaskId, datasetPid, bytesTransferred, filesTransferred, totalFiles, completed, err.Error())
+	errString := ""
+	if err != nil {
+		errString = err.Error()
+	}
+	log.Printf("'%s' task for '%s' dataset - bytes transferred: %d, files transferred: %d, total files detected: %d, completed %v, error message: '%s'\n", globusTaskId, datasetPid, bytesTransferred, filesTransferred, totalFiles, completed, errString)
 }

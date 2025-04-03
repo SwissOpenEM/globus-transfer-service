@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 
@@ -19,6 +20,8 @@ func main() {
 	if err != nil {
 		log.Fatalf("couldn't read config: %s\n", err.Error())
 	}
+
+	fmt.Printf("CONFIG FER YA: %v\n", conf)
 
 	globusClient, err := globus.AuthCreateServiceClient(context.Background(), globusClientId, globusClientSecret, conf.GlobusScopes)
 	if err != nil {
