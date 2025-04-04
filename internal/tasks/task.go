@@ -6,15 +6,17 @@ import (
 	"time"
 
 	"github.com/SwissOpenEM/globus"
+	"github.com/SwissOpenEM/globus-transfer-service/internal/serviceuser"
 )
 
 type transferTask struct {
-	scicatUrl        *string
-	globusClient     globus.GlobusClient
-	globusTaskId     string
-	datasetPid       string
-	scicatJobId      string
-	taskPollInterval time.Duration
+	scicatUrl         *string
+	globusClient      globus.GlobusClient
+	scicatServiceUser serviceuser.ScicatServiceUser
+	globusTaskId      string
+	datasetPid        string
+	scicatJobId       string
+	taskPollInterval  time.Duration
 }
 
 func (t transferTask) execute() {
@@ -30,10 +32,14 @@ func (t transferTask) execute() {
 			statusCode = "998"
 			statusMessage = "an error has occured during task polling, this job is not updated anymore"
 		}
-		// TODO: do something about the token requirement!!
+
+		token, err := t.scicatServiceUser.GetToken()
+		if err != nil {
+			log.Fatalf("getting token failed, task with scicat job id '%s', dataset pid '%s', globus id '%s' cannot be updated: %s", t.scicatJobId, t.datasetPid, t.globusTaskId, err.Error())
+		}
 		UpdateGlobusTransferScicatJob(
 			*t.scicatUrl,
-			"",
+			token,
 			t.scicatJobId,
 			statusCode,
 			statusMessage, GlobusTransferScicatJobResultObject{

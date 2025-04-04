@@ -18,7 +18,6 @@ var swaggerYAML embed.FS
 func NewServer(api *ServerHandler, port uint, scicatUrl string) (*http.Server, error) {
 	r := gin.New()
 
-	// TODO: get the openapi.yaml embedded somehow
 	r.GET("/openapi.yaml", func(c *gin.Context) {
 		http.FileServer(http.FS(swaggerYAML)).ServeHTTP(c.Writer, c.Request)
 	})
