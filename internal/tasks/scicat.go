@@ -28,9 +28,9 @@ type scicatJobPost struct {
 }
 
 type scicatGlobusTransferJobPatch struct {
-	StatusCode    string                              `json:"statusCode,omitempty"`
-	StatusMessage string                              `json:"statusMessage,omitempty"`
-	JobResult     GlobusTransferScicatJobResultObject `json:"jobResult,omitempty"`
+	StatusCode      string                              `json:"statusCode,omitempty"`
+	StatusMessage   string                              `json:"statusMessage,omitempty"`
+	JobResultObject GlobusTransferScicatJobResultObject `json:"jobResultObject,omitempty"`
 }
 
 type GlobusTransferScicatJobResultObject struct {
@@ -59,14 +59,15 @@ type GlobusTransferScicatJob struct {
 	JobResultObject GlobusTransferScicatJobResultObject `json:"jobResultObject"`
 }
 
-func CreateGlobusTransferScicatJob(scicatUrl string, scicatToken string, datasetPid string) (GlobusTransferScicatJob, error) {
+func CreateGlobusTransferScicatJob(scicatUrl string, scicatToken string, ownerGroup string, datasetPid string) (GlobusTransferScicatJob, error) {
 	url, err := url.JoinPath(scicatUrl, "api", "v4", "jobs")
 	if err != nil {
 		return GlobusTransferScicatJob{}, err
 	}
 
 	reqBody, err := json.Marshal(scicatJobPost{
-		Type: "globus_transfer_job",
+		Type:       "globus_transfer_job",
+		OwnerGroup: ownerGroup,
 		JobParams: ScicatJobParams{
 			[]ScicatJobDatasetElement{
 				{
@@ -129,9 +130,9 @@ func UpdateGlobusTransferScicatJob(scicatUrl string, scicatToken string, jobId s
 	}
 
 	reqBody, err := json.Marshal(scicatGlobusTransferJobPatch{
-		StatusCode:    statusCode,
-		StatusMessage: statusMessage,
-		JobResult:     jobStatus,
+		StatusCode:      statusCode,
+		StatusMessage:   statusMessage,
+		JobResultObject: jobStatus,
 	})
 	if err != nil {
 		return GlobusTransferScicatJob{}, err

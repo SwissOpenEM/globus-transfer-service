@@ -35,7 +35,7 @@ func main() {
 
 	taskPool := tasks.CreateTaskPool(conf.ScicatUrl, globusClient, serviceUser, conf.Task.MaxConcurrency, conf.Task.QueueSize, conf.Task.PollInterval)
 
-	serverHandler, err := api.NewServerHandler(globusClient, conf.GlobusScopes, conf.ScicatUrl, conf.FacilityCollectionIDs, conf.FacilitySrcGroupTemplate, conf.FacilityDstGroupTemplate, conf.DstPathTemplate, taskPool)
+	serverHandler, err := api.NewServerHandler(globusClient, conf.GlobusScopes, conf.ScicatUrl, serviceUser, conf.FacilityCollectionIDs, conf.FacilitySrcGroupTemplate, conf.FacilityDstGroupTemplate, conf.DstPathTemplate, taskPool)
 	if err != nil {
 		log.Fatal(err)
 	}

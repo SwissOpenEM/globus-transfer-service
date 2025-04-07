@@ -14,6 +14,7 @@ import (
 	"text/template"
 
 	"github.com/SwissOpenEM/globus"
+	"github.com/SwissOpenEM/globus-transfer-service/internal/serviceuser"
 	"github.com/SwissOpenEM/globus-transfer-service/internal/tasks"
 	"github.com/gin-gonic/gin"
 )
@@ -23,6 +24,7 @@ import (
 type ServerHandler struct {
 	globusClient          globus.GlobusClient
 	scicatUrl             string
+	scicatServiceUser     serviceuser.ScicatServiceUser
 	facilityCollectionIDs map[string]string
 	srcGroupTemplate      *template.Template
 	dstGroupTemplate      *template.Template
@@ -37,7 +39,7 @@ type ScicatDataset struct {
 
 var _ StrictServerInterface = ServerHandler{}
 
-func NewServerHandler(globusClient globus.GlobusClient, scopes []string, scicatUrl string, facilityCollectionIDs map[string]string, srcGroupTemplateBody string, dstGroupTemplateBody string, dstPathTemplateBody string, taskPool tasks.TaskPool) (ServerHandler, error) {
+func NewServerHandler(globusClient globus.GlobusClient, scopes []string, scicatUrl string, scicatServiceUser serviceuser.ScicatServiceUser, facilityCollectionIDs map[string]string, srcGroupTemplateBody string, dstGroupTemplateBody string, dstPathTemplateBody string, taskPool tasks.TaskPool) (ServerHandler, error) {
 	// create server with service client
 	var err error
 	if !globusClient.IsClientSet() {
@@ -61,6 +63,7 @@ func NewServerHandler(globusClient globus.GlobusClient, scopes []string, scicatU
 
 	return ServerHandler{
 		scicatUrl:             scicatUrl,
+		scicatServiceUser:     scicatServiceUser,
 		globusClient:          globusClient,
 		facilityCollectionIDs: facilityCollectionIDs,
 		srcGroupTemplate:      srcGroupTemplate,
@@ -220,12 +223,21 @@ func (s ServerHandler) PostTransferTask(ctx context.Context, request PostTransfe
 		}, nil
 	}
 
-	job, err := tasks.CreateGlobusTransferScicatJob(s.scicatUrl, scicatUser.ScicatToken, params.Pid)
+	serviceUserToken, err := s.scicatServiceUser.GetToken()
 	if err != nil {
 		return PostTransferTask500JSONResponse{
-			Message: getPointerOrNil(
-				fmt.Sprintf("failed creating transfer job in SciCat"),
-			),
+			Message: getPointerOrNil("service user login failed"),
+			Details: getPointerOrNil(err.Error()),
+		}, nil
+	}
+
+	// TODO: replace the service user token with the current user's token if it becomes possible to create the job as one's own user
+	//   , which will happen once the required changes are merged into BE SciCat. If the changes will still not allow this, just
+	//   remove this TODO.
+	job, err := tasks.CreateGlobusTransferScicatJob(s.scicatUrl, serviceUserToken, "admin", params.Pid)
+	if err != nil {
+		return PostTransferTask500JSONResponse{
+			Message: getPointerOrNil("failed creating transfer job in SciCat"),
 			Details: getPointerOrNil(err.Error()),
 		}, nil
 	}

@@ -20,10 +20,16 @@ type ScicatServiceUser struct {
 }
 
 func CreateServiceUser(scicatUrl string, username string, password string) (ScicatServiceUser, error) {
+	var emptyString = ""
+	var zeroTime = time.Time{}
+	var mutex sync.Mutex
 	serviceUser := ScicatServiceUser{
-		scicatUrl: &scicatUrl,
-		username:  &username,
-		password:  &password,
+		scicatUrl:   &scicatUrl,
+		username:    &username,
+		password:    &password,
+		scicatToken: &emptyString,
+		expiry:      &zeroTime,
+		mutex:       &mutex,
 	}
 	return serviceUser, serviceUser.refreshToken()
 }
@@ -37,7 +43,7 @@ func (su *ScicatServiceUser) GetToken() (string, error) {
 			return "", err
 		}
 	}
-	return "", nil
+	return *su.scicatToken, nil
 }
 
 func (su *ScicatServiceUser) refreshToken() error {
@@ -50,7 +56,7 @@ func (su *ScicatServiceUser) refreshToken() error {
 	if !ok {
 		return fmt.Errorf("token wasn't part of the user struct")
 	}
-	su.scicatToken = &token
+	*su.scicatToken = token
 
 	createdStr, ok := user["created"]
 	if !ok {
@@ -72,7 +78,6 @@ func (su *ScicatServiceUser) refreshToken() error {
 		return err
 	}
 
-	expiry := created.Add(time.Second * time.Duration(expiresIn))
-	su.expiry = &expiry
+	*su.expiry = created.Add(time.Second * time.Duration(expiresIn))
 	return nil
 }

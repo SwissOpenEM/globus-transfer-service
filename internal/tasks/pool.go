@@ -28,12 +28,13 @@ func CreateTaskPool(scicatUrl string, globusClient globus.GlobusClient, scicatSe
 
 func (tp TaskPool) AddTransferTask(globusTaskId string, datasetPid string, scicatJobId string) pond.Task {
 	task := transferTask{
-		scicatUrl:        &tp.scicatUrl,
-		globusClient:     tp.globusClient,
-		globusTaskId:     globusTaskId,
-		datasetPid:       datasetPid,
-		scicatJobId:      scicatJobId,
-		taskPollInterval: tp.taskPollInterval,
+		scicatUrl:         &tp.scicatUrl,
+		globusClient:      tp.globusClient,
+		scicatServiceUser: tp.scicatServiceUser,
+		globusTaskId:      globusTaskId,
+		datasetPid:        datasetPid,
+		scicatJobId:       scicatJobId,
+		taskPollInterval:  tp.taskPollInterval,
 	}
 
 	return tp.pool.Submit(task.execute)

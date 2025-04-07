@@ -25,17 +25,22 @@ func (t transferTask) execute() {
 	var err error
 	for {
 		bytesTransferred, filesTransferred, totalFiles, completed, err = checkTransfer(t.globusClient, t.globusTaskId)
-		updateTaskInScicat(t.globusTaskId, t.datasetPid, bytesTransferred, filesTransferred, totalFiles, completed, err)
+		taskLog(t.scicatJobId, t.globusTaskId, t.datasetPid, bytesTransferred, filesTransferred, totalFiles, completed, err)
 		statusCode := "002"
 		statusMessage := "transferring"
+		errMsg := ""
 		if err != nil {
 			statusCode = "998"
 			statusMessage = "an error has occured during task polling, this job is not updated anymore"
+			errMsg = err.Error()
 		}
-
 		token, err := t.scicatServiceUser.GetToken()
 		if err != nil {
 			log.Fatalf("getting token failed, task with scicat job id '%s', dataset pid '%s', globus id '%s' cannot be updated: %s", t.scicatJobId, t.datasetPid, t.globusTaskId, err.Error())
+		}
+		if completed {
+			statusCode = "003"
+			statusMessage = "finished"
 		}
 		UpdateGlobusTransferScicatJob(
 			*t.scicatUrl,
@@ -47,7 +52,7 @@ func (t transferTask) execute() {
 				FilesTransferred: uint(filesTransferred),
 				FilesTotal:       uint(totalFiles),
 				Completed:        completed,
-				Error:            err.Error(),
+				Error:            errMsg,
 			},
 		)
 		if completed || (err != nil) {
@@ -84,10 +89,10 @@ func checkTransfer(client globus.GlobusClient, globusTaskId string) (bytesTransf
 	}
 }
 
-func updateTaskInScicat(globusTaskId string, datasetPid string, bytesTransferred int, filesTransferred int, totalFiles int, completed bool, err error) {
+func taskLog(sciacatJobId string, globusTaskId string, datasetPid string, bytesTransferred int, filesTransferred int, totalFiles int, completed bool, err error) {
 	errString := ""
 	if err != nil {
 		errString = err.Error()
 	}
-	log.Printf("'%s' task for '%s' dataset - bytes transferred: %d, files transferred: %d, total files detected: %d, completed %v, error message: '%s'\n", globusTaskId, datasetPid, bytesTransferred, filesTransferred, totalFiles, completed, errString)
+	log.Printf("'%s' scicat job, '%s' globus task for '%s' dataset - bytes transferred: %d, files transferred: %d, total files detected: %d, completed %v, error message: '%s'\n", sciacatJobId, globusTaskId, datasetPid, bytesTransferred, filesTransferred, totalFiles, completed, errString)
 }
