@@ -3,10 +3,12 @@ package tasks
 import (
 	"fmt"
 	"log"
+	"net/http"
 	"time"
 
 	"github.com/SwissOpenEM/globus"
 	"github.com/SwissOpenEM/globus-transfer-service/internal/serviceuser"
+	"github.com/paulscherrerinstitute/scicat-cli/v3/datasetIngestor"
 )
 
 type transferTask struct {
@@ -36,7 +38,8 @@ func (t transferTask) execute() {
 		}
 		token, err := t.scicatServiceUser.GetToken()
 		if err != nil {
-			log.Fatalf("getting token failed, task with scicat job id '%s', dataset pid '%s', globus id '%s' cannot be updated: %s", t.scicatJobId, t.datasetPid, t.globusTaskId, err.Error())
+			log.Printf("getting token failed, task with scicat job id '%s', dataset pid '%s', globus id '%s' cannot be updated: %s\n", t.scicatJobId, t.datasetPid, t.globusTaskId, err.Error())
+			break
 		}
 		if completed {
 			statusCode = "003"
@@ -47,7 +50,8 @@ func (t transferTask) execute() {
 			token,
 			t.scicatJobId,
 			statusCode,
-			statusMessage, GlobusTransferScicatJobResultObject{
+			statusMessage,
+			GlobusTransferScicatJobResultObject{
 				BytesTransferred: uint(bytesTransferred),
 				FilesTransferred: uint(filesTransferred),
 				FilesTotal:       uint(totalFiles),
@@ -59,6 +63,30 @@ func (t transferTask) execute() {
 			break
 		}
 		time.Sleep(t.taskPollInterval)
+	}
+
+	if !completed || err != nil {
+		return // if not completed or error'd, don't mark the dataset as archivable
+	}
+
+	token, _ := t.scicatServiceUser.GetToken()
+	err = datasetIngestor.MarkFilesReady(http.DefaultClient, *t.scicatUrl+"api/v3", t.datasetPid, map[string]string{"accessToken": token})
+	if err != nil {
+		errMsg := err.Error()
+
+		_, err = UpdateGlobusTransferScicatJob(
+			*t.scicatUrl,
+			token,
+			t.scicatJobId,
+			"997",
+			"completed but can't mark dataset as archivable",
+			GlobusTransferScicatJobResultObject{
+				Error: errMsg,
+			},
+		)
+		if err != nil {
+			log.Printf("the job is completed but can't mark dataset as archivable: %s\n", errMsg)
+		}
 	}
 }
 
