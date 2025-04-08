@@ -234,7 +234,7 @@ func (s ServerHandler) PostTransferTask(ctx context.Context, request PostTransfe
 	// TODO: replace the service user token with the current user's token if it becomes possible to create the job as one's own user
 	//   , which will happen once the required changes are merged into BE SciCat. If the changes will still not allow this, just
 	//   remove this TODO.
-	job, err := tasks.CreateGlobusTransferScicatJob(s.scicatUrl, serviceUserToken, "admin", params.Pid)
+	job, err := tasks.CreateGlobusTransferScicatJob(s.scicatUrl, serviceUserToken, dataset.OwnerGroup, params.Pid)
 	if err != nil {
 		return PostTransferTask500JSONResponse{
 			Message: getPointerOrNil("failed creating transfer job in SciCat"),
