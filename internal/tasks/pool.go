@@ -39,3 +39,14 @@ func (tp TaskPool) AddTransferTask(globusTaskId string, datasetPid string, scica
 
 	return tp.pool.Submit(task.execute)
 }
+
+func (tp TaskPool) CanSubmitJob() bool {
+	if tp.pool.QueueSize() == 0 {
+		return true
+	}
+	return tp.pool.WaitingTasks() < uint64(tp.pool.QueueSize())
+}
+
+func (tp TaskPool) IsQueueSizeLimited() bool {
+	return tp.pool.QueueSize() > 0
+}

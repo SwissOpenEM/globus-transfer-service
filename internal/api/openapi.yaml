@@ -75,6 +75,9 @@ paths:
         "500":
           description: an internal server error was encountered
           $ref: "#/components/responses/GeneralErrorResponse"
+        "503":
+          description: the server can't currently handle more requests, try again later
+          $ref: "#/components/responses/GeneralErrorResponse"
 
 components:
   securitySchemes:

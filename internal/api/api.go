@@ -11,6 +11,7 @@ import (
 	"path"
 	"reflect"
 	"slices"
+	"sync"
 	"text/template"
 
 	"github.com/SwissOpenEM/globus"
@@ -30,6 +31,7 @@ type ServerHandler struct {
 	dstGroupTemplate      *template.Template
 	dstPathTemplate       DestinationTemplate
 	taskPool              tasks.TaskPool
+	addTaskMutex          *sync.Mutex
 }
 
 type ScicatDataset struct {
@@ -70,6 +72,7 @@ func NewServerHandler(globusClient globus.GlobusClient, scopes []string, scicatU
 		dstGroupTemplate:      dstGroupTemplate,
 		dstPathTemplate:       dstPathTemplate,
 		taskPool:              taskPool,
+		addTaskMutex:          &sync.Mutex{},
 	}, err
 }
 
@@ -195,6 +198,16 @@ func (s ServerHandler) PostTransferTask(ctx context.Context, request PostTransfe
 	}
 
 	// request the transfer
+	if s.taskPool.IsQueueSizeLimited() {
+		s.addTaskMutex.Lock()
+		defer s.addTaskMutex.Unlock()
+		if !s.taskPool.CanSubmitJob() {
+			return PostTransferTask503JSONResponse{
+				Message: getPointerOrNil("the task queue is currently full, try again later..."),
+			}, nil
+		}
+	}
+
 	params := destPathParams{
 		DatasetFolder: path.Base(dataset.SourceFolder),
 		SourceFolder:  dataset.SourceFolder,
@@ -235,6 +248,14 @@ func (s ServerHandler) PostTransferTask(ctx context.Context, request PostTransfe
 	} else {
 		// sync folders through globus
 		globusResult, err = s.globusClient.TransferFolderSync(sourceCollectionID, sourcePath, destCollectionID, destPath, false)
+	}
+	if err != nil {
+		return PostTransferTask400JSONResponse{
+			GeneralErrorResponseJSONResponse: GeneralErrorResponseJSONResponse{
+				Message: getPointerOrNil("can't request globus transfer"),
+				Details: getPointerOrNil(err.Error()),
+			},
+		}, nil
 	}
 
 	serviceUserToken, err := s.scicatServiceUser.GetToken()
