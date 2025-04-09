@@ -5,9 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"time"
+
+	"github.com/SwissOpenEM/globus-transfer-service/internal/serviceuser"
 )
 
 type ScicatJobDatasetElement struct {
@@ -34,11 +37,12 @@ type scicatGlobusTransferJobPatch struct {
 }
 
 type GlobusTransferScicatJobResultObject struct {
-	BytesTransferred uint   `json:"bytesTransferred,omitempty"`
-	FilesTransferred uint   `json:"filesTransferred,omitempty"`
-	FilesTotal       uint   `json:"filesTotal,omitempty"`
-	Completed        bool   `json:"completed,omitempty"`
-	Error            string `json:"error,omitempty"`
+	GlobusTaskId     string `json:"globusTaskId"`
+	BytesTransferred uint   `json:"bytesTransferred"`
+	FilesTransferred uint   `json:"filesTransferred"`
+	FilesTotal       uint   `json:"filesTotal"`
+	Completed        bool   `json:"completed"`
+	Error            string `json:"error"`
 }
 
 type GlobusTransferScicatJob struct {
@@ -59,7 +63,7 @@ type GlobusTransferScicatJob struct {
 	JobResultObject GlobusTransferScicatJobResultObject `json:"jobResultObject"`
 }
 
-func CreateGlobusTransferScicatJob(scicatUrl string, scicatToken string, ownerGroup string, datasetPid string) (GlobusTransferScicatJob, error) {
+func CreateGlobusTransferScicatJob(scicatUrl string, scicatToken string, ownerGroup string, datasetPid string, globusTaskId string) (GlobusTransferScicatJob, error) {
 	url, err := url.JoinPath(scicatUrl, "api", "v4", "jobs")
 	if err != nil {
 		return GlobusTransferScicatJob{}, err
@@ -115,6 +119,7 @@ func CreateGlobusTransferScicatJob(scicatUrl string, scicatToken string, ownerGr
 	}
 
 	return UpdateGlobusTransferScicatJob(scicatUrl, scicatToken, job.ID, "001", "started", GlobusTransferScicatJobResultObject{
+		GlobusTaskId:     globusTaskId,
 		BytesTransferred: 0,
 		FilesTransferred: 0,
 		FilesTotal:       0,
@@ -172,4 +177,62 @@ func UpdateGlobusTransferScicatJob(scicatUrl string, scicatToken string, jobId s
 	job := GlobusTransferScicatJob{}
 	err = json.Unmarshal(body, &job)
 	return job, err
+}
+
+func RestoreGlobusTransferJobsFromScicat(scicatUrl string, serviceUser serviceuser.ScicatServiceUser, pool TaskPool) error {
+	url, err := url.JoinPath(scicatUrl, "api", "v4", "jobs")
+	if err != nil {
+		return err
+	}
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return err
+	}
+
+	// TODO: maybe add pagination or a limit to the filter
+	q := req.URL.Query()
+	q.Set("filter", `{"where":{"type":"globus_transfer_job","jobResultObject.completed":false,"jobResultObject.error":""}}`)
+	req.URL.RawQuery = q.Encode()
+
+	token, err := serviceUser.GetToken()
+	if err != nil {
+		return err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+
+	unfinishedJobs := []GlobusTransferScicatJob{}
+	err = json.Unmarshal(body, &unfinishedJobs)
+	if err != nil {
+		return err
+	}
+
+	for _, job := range unfinishedJobs {
+		if job.JobResultObject.GlobusTaskId == "" {
+			log.Printf("Warning: job with id '%s' has no globus task id, so it cannot be resumed\n", job.ID)
+			continue
+		}
+		if len(job.JobParams.DatasetList) > 1 {
+			log.Printf("Warning: job with id '%s' has more than one associated dataset (a total of %d), which is not currently supported\n", job.ID, len(job.JobParams.DatasetList))
+			continue
+		}
+		if len(job.JobParams.DatasetList) <= 0 {
+			log.Printf("Warning: job with id '%s' has no datasets associated, so it cannot be resumed\n", job.ID)
+		}
+		pool.AddTransferTask(job.JobResultObject.GlobusTaskId, job.JobParams.DatasetList[0].Pid, job.ID)
+	}
+
+	return nil
 }

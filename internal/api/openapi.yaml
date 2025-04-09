@@ -60,9 +60,9 @@ paths:
             application/json:
               schema:
                 properties:
-                  taskId:
+                  jobId:
                     type: string
-                    description: the task id of the transfer task that was created
+                    description: the SciCat job id of the transfer job
         "400":
           description: something went wrong with the request, usually due to some external service signalling an error
           $ref: "#/components/responses/GeneralErrorResponse"

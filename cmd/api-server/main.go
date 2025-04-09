@@ -30,10 +30,15 @@ func main() {
 
 	globusClient, err := globus.AuthCreateServiceClient(context.Background(), globusClientId, globusClientSecret, conf.GlobusScopes)
 	if err != nil {
-		log.Fatalf("couldn't create globus client %s\n", err.Error())
+		log.Fatalf("couldn't create globus client: %s\n", err.Error())
 	}
 
 	taskPool := tasks.CreateTaskPool(conf.ScicatUrl, globusClient, serviceUser, conf.Task.MaxConcurrency, conf.Task.QueueSize, conf.Task.PollInterval)
+
+	err = tasks.RestoreGlobusTransferJobsFromScicat(conf.ScicatUrl, serviceUser, taskPool)
+	if err != nil {
+		log.Fatalf("couldn't resume unfinished jobs: %s\n", err.Error())
+	}
 
 	serverHandler, err := api.NewServerHandler(globusClient, conf.GlobusScopes, conf.ScicatUrl, serviceUser, conf.FacilityCollectionIDs, conf.FacilitySrcGroupTemplate, conf.FacilityDstGroupTemplate, conf.DstPathTemplate, taskPool)
 	if err != nil {

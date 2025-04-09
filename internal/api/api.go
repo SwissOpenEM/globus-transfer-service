@@ -214,31 +214,12 @@ func (s ServerHandler) PostTransferTask(ctx context.Context, request PostTransfe
 		}, nil
 	}
 
-	var result globus.TransferResult
+	var globusResult globus.TransferResult
 	if request.Body == nil {
 		return PostTransferTask400JSONResponse{
 			GeneralErrorResponseJSONResponse: GeneralErrorResponseJSONResponse{
 				Message: getPointerOrNil("no body was sent with the request"),
 			},
-		}, nil
-	}
-
-	serviceUserToken, err := s.scicatServiceUser.GetToken()
-	if err != nil {
-		return PostTransferTask500JSONResponse{
-			Message: getPointerOrNil("service user login failed"),
-			Details: getPointerOrNil(err.Error()),
-		}, nil
-	}
-
-	// TODO: replace the service user token with the current user's token if it becomes possible to create the job as one's own user
-	//   , which will happen once the required changes are merged into BE SciCat. If the changes will still not allow this, just
-	//   remove this TODO.
-	job, err := tasks.CreateGlobusTransferScicatJob(s.scicatUrl, serviceUserToken, dataset.OwnerGroup, params.Pid)
-	if err != nil {
-		return PostTransferTask500JSONResponse{
-			Message: getPointerOrNil("failed creating transfer job in SciCat"),
-			Details: getPointerOrNil(err.Error()),
 		}, nil
 	}
 
@@ -250,35 +231,38 @@ func (s ServerHandler) PostTransferTask(ctx context.Context, request PostTransfe
 			paths[i] = file.Path
 			isSymlinks[i] = file.IsSymlink
 		}
-		result, err = s.globusClient.TransferFileList(sourceCollectionID, sourcePath, destCollectionID, destPath, paths, isSymlinks, false)
+		globusResult, err = s.globusClient.TransferFileList(sourceCollectionID, sourcePath, destCollectionID, destPath, paths, isSymlinks, false)
 	} else {
 		// sync folders through globus
-		result, err = s.globusClient.TransferFolderSync(sourceCollectionID, sourcePath, destCollectionID, destPath, false)
+		globusResult, err = s.globusClient.TransferFolderSync(sourceCollectionID, sourcePath, destCollectionID, destPath, false)
 	}
 
+	serviceUserToken, err := s.scicatServiceUser.GetToken()
 	if err != nil {
-		tasks.UpdateGlobusTransferScicatJob(
-			s.scicatUrl,
-			scicatUser.ScicatToken,
-			job.ID,
-			"999",
-			"globus transfer request creation failed",
-			tasks.GlobusTransferScicatJobResultObject{
-				Error: err.Error(),
-			},
-		)
-		return PostTransferTask400JSONResponse{
-			GeneralErrorResponseJSONResponse: GeneralErrorResponseJSONResponse{
-				Message: getPointerOrNil(fmt.Sprintf("transfer request failed: %s", err.Error())),
-			},
+		_, _ = s.globusClient.TransferCancelTaskByID(globusResult.TaskId) // attempt to cancel transfer
+		return PostTransferTask500JSONResponse{
+			Message: getPointerOrNil("service user login failed"),
+			Details: getPointerOrNil(err.Error()),
 		}, nil
 	}
 
-	s.taskPool.AddTransferTask(result.TaskId, request.Params.ScicatPid, job.ID)
+	// TODO: replace the service user token with the current user's token if it becomes possible to create the scicatJob as one's own user
+	//   , which will happen once the required changes are merged into BE SciCat. If the changes will still not allow this, just
+	//   remove this TODO.
+	scicatJob, err := tasks.CreateGlobusTransferScicatJob(s.scicatUrl, serviceUserToken, dataset.OwnerGroup, params.Pid, "")
+	if err != nil {
+		_, _ = s.globusClient.TransferCancelTaskByID(globusResult.TaskId) // attempt to cancel transfer
+		return PostTransferTask500JSONResponse{
+			Message: getPointerOrNil("failed creating transfer job in SciCat"),
+			Details: getPointerOrNil(err.Error()),
+		}, nil
+	}
+
+	s.taskPool.AddTransferTask(globusResult.TaskId, request.Params.ScicatPid, scicatJob.ID)
 
 	// return response
 	return PostTransferTask200JSONResponse{
-		TaskId: getPointerOrNil(result.TaskId),
+		JobId: getPointerOrNil(scicatJob.ID),
 	}, nil
 }
 

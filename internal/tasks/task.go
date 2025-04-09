@@ -45,13 +45,14 @@ func (t transferTask) execute() {
 			statusCode = "003"
 			statusMessage = "finished"
 		}
-		UpdateGlobusTransferScicatJob(
+		_, err = UpdateGlobusTransferScicatJob(
 			*t.scicatUrl,
 			token,
 			t.scicatJobId,
 			statusCode,
 			statusMessage,
 			GlobusTransferScicatJobResultObject{
+				GlobusTaskId:     t.globusTaskId,
 				BytesTransferred: uint(bytesTransferred),
 				FilesTransferred: uint(filesTransferred),
 				FilesTotal:       uint(totalFiles),
