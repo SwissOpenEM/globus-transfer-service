@@ -8,6 +8,7 @@ import (
 
 	"github.com/SwissOpenEM/globus"
 	"github.com/SwissOpenEM/globus-transfer-service/internal/serviceuser"
+	"github.com/SwissOpenEM/globus-transfer-service/jobs"
 	"github.com/paulscherrerinstitute/scicat-cli/v3/datasetIngestor"
 )
 
@@ -51,7 +52,7 @@ func (t transferTask) execute() {
 			t.scicatJobId,
 			statusCode,
 			statusMessage,
-			GlobusTransferScicatJobResultObject{
+			jobs.JobResultObject{
 				GlobusTaskId:     t.globusTaskId,
 				BytesTransferred: uint(bytesTransferred),
 				FilesTransferred: uint(filesTransferred),
@@ -81,7 +82,7 @@ func (t transferTask) execute() {
 			t.scicatJobId,
 			"997",
 			"completed but can't mark dataset as archivable",
-			GlobusTransferScicatJobResultObject{
+			jobs.JobResultObject{
 				Error: errMsg,
 			},
 		)
