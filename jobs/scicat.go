@@ -76,3 +76,32 @@ func GetJobList(scicatUrl string, scicatToken string, filter string) ([]ScicatJo
 	err = json.Unmarshal(body, &jobs)
 	return jobs, err
 }
+
+func GetJobById(scicatUrl string, scicatToken string, jobId string) (ScicatJob, error) {
+	url, err := url.JoinPath(scicatUrl, "api", "v4", "jobs", jobId)
+	if err != nil {
+		return ScicatJob{}, err
+	}
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return ScicatJob{}, err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+scicatToken)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return ScicatJob{}, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return ScicatJob{}, err
+	}
+
+	job := ScicatJob{}
+	err = json.Unmarshal(body, &job)
+	return job, err
+}
