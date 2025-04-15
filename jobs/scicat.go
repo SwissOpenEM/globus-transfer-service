@@ -2,9 +2,11 @@ package jobs
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 )
 
@@ -51,6 +53,14 @@ type ScicatJob struct {
 	ContactEmail    string          `json:"contactEmail"`
 	ConfigVersion   string          `json:"configVersion"`
 	JobResultObject JobResultObject `json:"jobResultObject"`
+}
+
+type JobNotFoundErr struct {
+	msg string
+}
+
+func (e *JobNotFoundErr) Error() string {
+	return e.msg
 }
 
 func GetJobList(scicatUrl string, scicatToken string, filter string) ([]ScicatJob, error) {
@@ -104,6 +114,21 @@ func GetJobById(scicatUrl string, scicatToken string, jobId string) (ScicatJob, 
 		return ScicatJob{}, err
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode == 403 {
+		return ScicatJob{}, fmt.Errorf("user doesn't have the right to access this dataset or user credentials are invalid")
+	}
+	if resp.StatusCode == 400 {
+		b, _ := io.ReadAll(resp.Body)
+		if strings.Contains(string(b), "Invalid job id") {
+			return ScicatJob{}, &JobNotFoundErr{"Job not found"}
+		}
+	}
+	if resp.StatusCode != 200 {
+		b, _ := io.ReadAll(resp.Body)
+		fmt.Printf("\n\n\nHELLO BELLO: '%s'\n\n\n", string(b))
+		return ScicatJob{}, fmt.Errorf("unknown error - statuscode: %d, status: %s", resp.StatusCode, resp.Status)
+	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {

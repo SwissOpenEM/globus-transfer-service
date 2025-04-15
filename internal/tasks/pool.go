@@ -20,6 +20,14 @@ type TaskPool struct {
 	cancelMutex       *sync.Mutex
 }
 
+type JobNotExistError struct {
+	msg string
+}
+
+func (e *JobNotExistError) Error() string {
+	return e.msg
+}
+
 func CreateTaskPool(scicatUrl string, globusClient globus.GlobusClient, scicatServiceUser serviceuser.ScicatServiceUser, maxConcurrency int, queueSize int, taskPollInterval uint) TaskPool {
 	return TaskPool{
 		scicatUrl:         scicatUrl,
@@ -27,6 +35,7 @@ func CreateTaskPool(scicatUrl string, globusClient globus.GlobusClient, scicatSe
 		scicatServiceUser: scicatServiceUser,
 		pool:              pond.NewPool(maxConcurrency, pond.WithQueueSize(queueSize)),
 		taskPollInterval:  time.Duration(taskPollInterval) * time.Second,
+		cancelTask:        map[string]chan struct{}{},
 		cancelMutex:       &sync.Mutex{},
 	}
 }
@@ -55,22 +64,16 @@ func (tp TaskPool) CancelTransferTask(scicatJobId string) error {
 		delete(tp.cancelTask, scicatJobId)
 		return nil
 	}
-	return fmt.Errorf("job with ID '%s' does not exist or is already cancelled/removed", scicatJobId)
+	return &JobNotExistError{fmt.Sprintf("job with ID '%s' does not exist or is already cancelled/removed", scicatJobId)}
 }
 
 func (tp TaskPool) DeleteTransferTask(scicatJobId string) error {
-	tp.cancelMutex.Lock()
-	defer tp.cancelMutex.Unlock()
-	if cancelChannel, ok := tp.cancelTask[scicatJobId]; ok {
-		cancelChannel <- struct{}{}
-		delete(tp.cancelTask, scicatJobId)
-	}
-
+	_ = tp.CancelTransferTask(scicatJobId)
 	token, err := tp.scicatServiceUser.GetToken()
 	if err != nil {
 		return err
 	}
-	return DeleteGlobusTransferScicatJob(tp.scicatUrl, token, scicatJobId)
+	return DeleteScicatJob(tp.scicatUrl, token, scicatJobId)
 }
 
 func (tp TaskPool) CanSubmitJob() bool {

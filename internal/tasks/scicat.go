@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"github.com/SwissOpenEM/globus-transfer-service/internal/serviceuser"
 	"github.com/SwissOpenEM/globus-transfer-service/jobs"
@@ -30,6 +31,14 @@ type scicatGlobusTransferJobPatch struct {
 type scicatErrorResp struct {
 	Status  string `json:"status"`
 	Message string `json:"Message"`
+}
+
+type JobDeleteNotExist struct {
+	scicatErrorResp
+}
+
+func (e *JobDeleteNotExist) Error() string {
+	return e.Message
 }
 
 func CreateGlobusTransferScicatJob(scicatUrl string, scicatToken string, ownerGroup string, datasetPid string, globusTaskId string) (jobs.ScicatJob, error) {
@@ -148,7 +157,7 @@ func UpdateGlobusTransferScicatJob(scicatUrl string, scicatToken string, jobId s
 	return job, err
 }
 
-func DeleteGlobusTransferScicatJob(scicatUrl string, scicatToken string, jobId string) error {
+func DeleteScicatJob(scicatUrl string, scicatToken string, jobId string) error {
 	url, err := url.JoinPath(scicatUrl, "api", "v4", "jobs", url.QueryEscape(jobId))
 	if err != nil {
 		return err
@@ -179,11 +188,14 @@ func DeleteGlobusTransferScicatJob(scicatUrl string, scicatToken string, jobId s
 			return fmt.Errorf("couldn't delete job, status 400 - unmarshaling error: %s", err.Error())
 		}
 
-		return fmt.Errorf("Status 400 - %s", errResp.Message)
+		if strings.Contains(errResp.Message, "doesn't exist") {
+			return &JobDeleteNotExist{scicatErrorResp{Message: fmt.Sprintf("status 400 - %s", errResp.Message)}}
+		}
+		return fmt.Errorf("status 400 - '%s'", errResp.Message)
 	}
 
 	if resp.StatusCode != 200 {
-		return fmt.Errorf("couldn't delete job, unknown status - status code: %d, status: %s")
+		return fmt.Errorf("couldn't delete job, unknown status - status code: %d, status: %s", resp.StatusCode, resp.Status)
 	}
 	return nil
 }

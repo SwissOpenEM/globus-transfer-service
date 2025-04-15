@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -256,7 +257,7 @@ func (s ServerHandler) DeleteTransferTask(ctx context.Context, req DeleteTransfe
 		}, nil
 	}
 
-	job, err := jobs.GetJobById(s.scicatUrl, serviceToken, "")
+	job, err := jobs.GetJobById(s.scicatUrl, serviceToken, req.ScicatJobId)
 	if err != nil {
 		return DeleteTransferTask400JSONResponse{
 			GeneralErrorResponseJSONResponse: GeneralErrorResponseJSONResponse{
@@ -279,6 +280,14 @@ func (s ServerHandler) DeleteTransferTask(ctx context.Context, req DeleteTransfe
 	}
 
 	if err != nil {
+		JobNotExistErr := &tasks.JobNotExistError{}
+		JobDelete400Err := &tasks.JobDeleteNotExist{}
+		JobNotFoundErr := &jobs.JobNotFoundErr{}
+		if errors.As(err, &JobNotExistErr) || errors.As(err, &JobDelete400Err) || errors.As(err, &JobNotFoundErr) {
+			return DeleteTransferTask400JSONResponse{GeneralErrorResponseJSONResponse{
+				Message: getPointerOrNil("the requested job does not exist or is already cancelled or deleted"),
+			}}, nil
+		}
 		return DeleteTransferTask500JSONResponse{
 			Message: getPointerOrNil("an error occured when attempting to delete and/or cancel your task"),
 			Details: getPointerOrNil(err.Error()),
