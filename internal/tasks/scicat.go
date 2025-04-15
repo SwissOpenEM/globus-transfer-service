@@ -27,6 +27,11 @@ type scicatGlobusTransferJobPatch struct {
 	JobResultObject jobs.JobResultObject `json:"jobResultObject,omitempty"`
 }
 
+type scicatErrorResp struct {
+	Status  string `json:"status"`
+	Message string `json:"Message"`
+}
+
 func CreateGlobusTransferScicatJob(scicatUrl string, scicatToken string, ownerGroup string, datasetPid string, globusTaskId string) (jobs.ScicatJob, error) {
 	url, err := url.JoinPath(scicatUrl, "api", "v4", "jobs")
 	if err != nil {
@@ -87,7 +92,7 @@ func CreateGlobusTransferScicatJob(scicatUrl string, scicatToken string, ownerGr
 		BytesTransferred: 0,
 		FilesTransferred: 0,
 		FilesTotal:       0,
-		Completed:        false,
+		Status:           jobs.Transferring,
 		Error:            "",
 	})
 }
@@ -141,6 +146,46 @@ func UpdateGlobusTransferScicatJob(scicatUrl string, scicatToken string, jobId s
 	job := jobs.ScicatJob{}
 	err = json.Unmarshal(body, &job)
 	return job, err
+}
+
+func DeleteGlobusTransferScicatJob(scicatUrl string, scicatToken string, jobId string) error {
+	url, err := url.JoinPath(scicatUrl, "api", "v4", "jobs", url.QueryEscape(jobId))
+	if err != nil {
+		return err
+	}
+
+	req, err := http.NewRequest("DELETE", url, nil)
+	if err != nil {
+		return err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+scicatToken)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == 400 {
+		b, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return fmt.Errorf("couldn't delete job, status 400 - body reading error: %s", err.Error())
+		}
+
+		var errResp scicatErrorResp
+		err = json.Unmarshal(b, &errResp)
+		if err != nil {
+			return fmt.Errorf("couldn't delete job, status 400 - unmarshaling error: %s", err.Error())
+		}
+
+		return fmt.Errorf("Status 400 - %s", errResp.Message)
+	}
+
+	if resp.StatusCode != 200 {
+		return fmt.Errorf("couldn't delete job, unknown status - status code: %d, status: %s")
+	}
+	return nil
 }
 
 func RestoreGlobusTransferJobsFromScicat(scicatUrl string, serviceUser serviceuser.ScicatServiceUser, pool TaskPool) error {

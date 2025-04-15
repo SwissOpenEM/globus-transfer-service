@@ -60,6 +60,12 @@ type PostTransferTaskParams struct {
 	ScicatPid string `form:"scicatPid" json:"scicatPid"`
 }
 
+// DeleteTransferTaskParams defines parameters for DeleteTransferTask.
+type DeleteTransferTaskParams struct {
+	// Delete Enables/disables deleting from scicat job system. By default, it's disabled (false).
+	Delete *bool `form:"delete,omitempty" json:"delete,omitempty"`
+}
+
 // PostTransferTaskJSONRequestBody defines body for PostTransferTask for application/json ContentType.
 type PostTransferTaskJSONRequestBody PostTransferTaskJSONBody
 
@@ -68,6 +74,9 @@ type ServerInterface interface {
 	// request a transfer task
 	// (POST /transfer)
 	PostTransferTask(c *gin.Context, params PostTransferTaskParams)
+	// cancels and/or deletes transfer entry
+	// (DELETE /transfer/{scicatJobId})
+	DeleteTransferTask(c *gin.Context, scicatJobId string, params DeleteTransferTaskParams)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -144,6 +153,43 @@ func (siw *ServerInterfaceWrapper) PostTransferTask(c *gin.Context) {
 	siw.Handler.PostTransferTask(c, params)
 }
 
+// DeleteTransferTask operation middleware
+func (siw *ServerInterfaceWrapper) DeleteTransferTask(c *gin.Context) {
+
+	var err error
+
+	// ------------- Path parameter "scicatJobId" -------------
+	var scicatJobId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "scicatJobId", c.Param("scicatJobId"), &scicatJobId, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter scicatJobId: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	c.Set(ScicatKeyAuthScopes, []string{})
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params DeleteTransferTaskParams
+
+	// ------------- Optional query parameter "delete" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "delete", c.Request.URL.Query(), &params.Delete)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter delete: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.DeleteTransferTask(c, scicatJobId, params)
+}
+
 // GinServerOptions provides options for the Gin server.
 type GinServerOptions struct {
 	BaseURL      string
@@ -172,6 +218,7 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 	}
 
 	router.POST(options.BaseURL+"/transfer", wrapper.PostTransferTask)
+	router.DELETE(options.BaseURL+"/transfer/:scicatJobId", wrapper.DeleteTransferTask)
 }
 
 type GeneralErrorResponseJSONResponse struct {
@@ -274,11 +321,87 @@ func (response PostTransferTask503JSONResponse) VisitPostTransferTaskResponse(w 
 	return json.NewEncoder(w).Encode(response)
 }
 
+type DeleteTransferTaskRequestObject struct {
+	ScicatJobId string `json:"scicatJobId"`
+	Params      DeleteTransferTaskParams
+}
+
+type DeleteTransferTaskResponseObject interface {
+	VisitDeleteTransferTaskResponse(w http.ResponseWriter) error
+}
+
+type DeleteTransferTask200Response struct {
+}
+
+func (response DeleteTransferTask200Response) VisitDeleteTransferTaskResponse(w http.ResponseWriter) error {
+	w.WriteHeader(200)
+	return nil
+}
+
+type DeleteTransferTask400JSONResponse struct {
+	GeneralErrorResponseJSONResponse
+}
+
+func (response DeleteTransferTask400JSONResponse) VisitDeleteTransferTaskResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type DeleteTransferTask401JSONResponse struct {
+	// Details further details, debugging information
+	Details *string `json:"details,omitempty"`
+
+	// Message the error message
+	Message *string `json:"message,omitempty"`
+}
+
+func (response DeleteTransferTask401JSONResponse) VisitDeleteTransferTaskResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type DeleteTransferTask403JSONResponse struct {
+	// Details further details, debugging information
+	Details *string `json:"details,omitempty"`
+
+	// Message the error message
+	Message *string `json:"message,omitempty"`
+}
+
+func (response DeleteTransferTask403JSONResponse) VisitDeleteTransferTaskResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type DeleteTransferTask500JSONResponse struct {
+	// Details further details, debugging information
+	Details *string `json:"details,omitempty"`
+
+	// Message the error message
+	Message *string `json:"message,omitempty"`
+}
+
+func (response DeleteTransferTask500JSONResponse) VisitDeleteTransferTaskResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 	// request a transfer task
 	// (POST /transfer)
 	PostTransferTask(ctx context.Context, request PostTransferTaskRequestObject) (PostTransferTaskResponseObject, error)
+	// cancels and/or deletes transfer entry
+	// (DELETE /transfer/{scicatJobId})
+	DeleteTransferTask(ctx context.Context, request DeleteTransferTaskRequestObject) (DeleteTransferTaskResponseObject, error)
 }
 
 type StrictHandlerFunc = strictgin.StrictGinHandlerFunc
@@ -328,25 +451,56 @@ func (sh *strictHandler) PostTransferTask(ctx *gin.Context, params PostTransferT
 	}
 }
 
+// DeleteTransferTask operation middleware
+func (sh *strictHandler) DeleteTransferTask(ctx *gin.Context, scicatJobId string, params DeleteTransferTaskParams) {
+	var request DeleteTransferTaskRequestObject
+
+	request.ScicatJobId = scicatJobId
+	request.Params = params
+
+	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteTransferTask(ctx, request.(DeleteTransferTaskRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteTransferTask")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		ctx.Error(err)
+		ctx.Status(http.StatusInternalServerError)
+	} else if validResponse, ok := response.(DeleteTransferTaskResponseObject); ok {
+		if err := validResponse.VisitDeleteTransferTaskResponse(ctx.Writer); err != nil {
+			ctx.Error(err)
+		}
+	} else if response != nil {
+		ctx.Error(fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"H4sIAAAAAAAC/6xWTY/bNhD9KwO2QC+K7XSbi2/bjw2MFKgR723hA02NLHolUuGMdiEE/u/FkJLltbVF",
-	"ms1Npjkf782bGX5VxteNd+iY1PKrCkiNd4Txx0d0GHT1Vwg+fO7/kHPjHaNj+dRNU1mj2Xo3P5B3ckam",
-	"xFrLVxN8g4Ftcpcja1v1n2SCbcRMLVXRBi4xQH8hgxx37X5v3R6sK3yoo3+VKe4aVEtFHKzbq2OmaiTS",
-	"e7x2ySUCSt4wXLmyPp5O/O6AhtVRjl660bBPHPTOIj3kMFonnBHPna3w3t8H7ajAMJ1OYSsE9sD9LdAE",
-	"jQ4MvgA9ngb80iKxyi7Ys7Tp6sq6x2vv1KCxhUWC5xIjk1xaSgEtgQbqLU+Id95XqJ1Q2GgupxOWfyS5",
-	"IfkMLEOpSUDsEAJWmu1TwlQi5Jo1IQP5NhiEwlc5hknaBaINmKvlQwqfnaHbXpclU4SmDZa7jVCe+NgY",
-	"0d0n7G7bBMBK3iXqFNXpWnxsjP1D87vb9erdJ+zGbHRj5XcsuWjsmoHPSAy36xUUPkR8Hyu/awmGIsMG",
-	"w5M1OIMVQ0tIkDIC9o/oKJrplkt03DfITMJbriT+K84koMrUEwZKWbyfLWYLKZNv0OnGqqW6mS1mNyoV",
-	"LjIx5zPdNZ74GsyKQVeVf05p9RKT/jrJjjU9Eui9to4YNCTiEpgRovBAfaraGN86BuNdYfdtwByeLZfn",
-	"d34hEHfaGek/UXMkYpWrpVp74gH+vabHiCjoGhkDqeXDlCJtLmwWFgNIfQdxDorTxlaWpcpRC19aDN0o",
-	"hXTrbrw0ypBDi9nZ3LoYT72JCL0llL5NvqbE/WojWZe6JBIfaQDjqwpN/OxdD1o7VXQaijj5MUDO0vlm",
-	"NDYfiB9afofnWpJMXilB7JC1zf9H0hKnF+N69ee3RL5EsU3BkPh3n3dvWGAyBP+2qb8sYx0Pfw5YqKX6",
-	"aT4u0nm/GeYXa2HcODoE3U2voDgfz5bwr4vFG1I++J1023+QevA7GCt6mgcHv5ugcmJFUmsMEhVtVXVA",
-	"rANjfr7PZLAI8t8Sjim6Tnjnky+OaPz+LcY332/84S1pf/j+yLL02rrWoVPLQb5XtGaK9V6GpToNjO3x",
-	"fF/GOXqxKR+20hG94aUw/hlmNKX9jrkMi5d7bOxnOVfXU2LaibTsKX8anfDYHpeO7vqHoR8dyoQc3mQv",
-	"H4e9Oy8W6rg9/hsAAP//Q3H6ztsKAAA=",
+	"H4sIAAAAAAAC/+RX32/bNhD+Vw7cgG6Aa6fr+uK3dm0KrwMWNHkL8kBTJ4sJRaq8UwIh8P8+HClZ/qF0",
+	"bbO3vdE073jfd9/dUY/KhLoJHj2TWj6qiNQET5h+fESPUbsPMYb4uf9D9k3wjJ5lqZvGWaPZBr+4peBl",
+	"j0yFtZZVE0ODkW12VyBr6/olmWgbMVNLVbaRK4zQH5hBget2s7F+A9aXIdbJv5op7hpUS0Ucrd+o7UzV",
+	"SKQ3eOqSKwSUuGE4cmK93e2E9S0aVlvZOnSjYZM56J0leshjss44E55z6/AqXEXtqcQ4HU5pHQIH4P4U",
+	"aIJGR4ZQgh53I35pkVjNjtizdNnVzvq7U+/UoLGlRYKHChOTXFnKF1oCDdRb7hCvQ3CovVDYaK6mA5Z/",
+	"JLgh+BlYhkqTgFgjRHSa7X3GVCEUmjUhA4U2GoQyuALjJO0C0UYs1PI6Xz/bQ3dzmpaZIjRttNxdCuWZ",
+	"j0sjuvuE3ds2A7ASd4U63+p1LT4ujf1D88u3F6uXn7Abo9GNld8p5aKxUwY+IzG8vVhBGWLC99GFdUsw",
+	"JBkuMd5bg3NYMbSEBDki4HCHnpKZbrlCz32BzOV6y07uf8KZXKhm6h4j5Shezc/mZ5Km0KDXjVVL9Xp+",
+	"Nn+tcuISEwve010TiE/BrBi0c+Ehh9VLTOprJzvWdEegN9p6YtCQictgRojCA/WhamNC6xlM8KXdtBEL",
+	"eLBc7Z95QSDutDdSf6LmRMSqUEt1EYgH+Fea7hKiqGtkjKSW11OKtIWwWVqMIPkdxDkoThvrLEuWkxa+",
+	"tBi7UQr51Pl4aJQhxxZne33rqD31JiL0llDqNvuaEveThWR9rpJEfKIBTHAOTVr2rget7TI6DUWc/DdA",
+	"9sL5ZjS2GIgfSn6N+1qSSJ5IQaqQC1t8R9ByTy/Gi9X7b7n5GMVNvgyJ34Wie8YAkyb4l831ZRnrtPlz",
+	"xFIt1U+LcZAu+smwOBoL48TRMeruqRF0yEza2BvKv52dPQPCbVhL9X2F5NuwhjHDu/5wG9YT1E6MTGqN",
+	"QaKyda4DYh0Zi/35Jo1GmPg945iib4d3MfkCScavnmP8+seN3zwn7Dc/frMMwbaudezUcpDzCa0zxXoj",
+	"zVPtGsiNWO4mxOIxl+CfIoNt1oFDnnhA9eNCNNCS+A9gpI+7/Uu1LxZB3m3iI50V9ZQx1Lkv54Eoe9QR",
+	"Y30yBN4ny+8ZAz5wJdrrG0z/fDjoLwncVzvMv/a5D16vHdKisJQWGaK0mgTuBNgc3nVQYKlbx/JMekHQ",
+	"mxbwS6kd4a/zJ3t5SsBEeLtHWu5gpz3gMOYcYvDwoAmMjtFiAaFl2K/I/2flHRRPljEdipdGUaPnlJ+p",
+	"Utp7iiZtHj1Cr28kVb3hcX7+HpRP+emMhRTV4RNxlIXsq1NhTjuRabgDQKMTHifPsaPz/psrjA7l8TF8",
+	"7hx+d/Xuglio7c32nwAAAP//nYTdhzYOAAA=",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file

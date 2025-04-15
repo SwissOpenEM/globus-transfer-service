@@ -79,7 +79,42 @@ paths:
         "503":
           description: the server can't currently handle more requests, try again later
           $ref: "#/components/responses/GeneralErrorResponse"
-
+  /transfer/{scicatJobId}:  
+    delete:
+      tags:
+        - transfer
+      summary: cancels and/or deletes transfer entry
+      description: allows the user to cancel a transfer and/or delete the job from the scicat job system 
+      operationId: DeleteTransferTask
+      parameters:
+        - name: scicatJobId
+          description: "nothing"
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: delete
+          description: Enables/disables deleting from scicat job system. By default, it's disabled (false).
+          in: query
+          required: false
+          schema:
+            type: boolean
+        
+      responses:
+        "200":
+          description: deletion was carried out successfully
+        "400":
+          description: a generic request error has occured, usually due to some external service signalling an error
+          $ref: "#/components/responses/GeneralErrorResponse"
+        "401":
+          description: the user does not have a valid auth session, so the request is rejected
+          $ref: "#/components/responses/GeneralErrorResponse"
+        "403":
+          description: the user doesn't have the right to request the deletion
+          $ref: "#/components/responses/GeneralErrorResponse"
+        "500":
+          description: an internal server error was encountered
+          $ref: "#/components/responses/GeneralErrorResponse"
 components:
   securitySchemes:
     ScicatKeyAuth:

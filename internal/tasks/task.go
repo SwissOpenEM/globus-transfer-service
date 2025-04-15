@@ -20,48 +20,26 @@ type transferTask struct {
 	datasetPid        string
 	scicatJobId       string
 	taskPollInterval  time.Duration
+	cancel            chan struct{}
+
+	// current status
+	bytesTransferred uint
+	filesTransferred uint
+	filesTotal       uint
 }
 
 func (t transferTask) execute() {
-	var bytesTransferred, filesTransferred, totalFiles int
-	var completed bool
-	var err error
+	completed := false
+	var err error = nil
 	for {
-		bytesTransferred, filesTransferred, totalFiles, completed, err = checkTransfer(t.globusClient, t.globusTaskId)
-		taskLog(t.scicatJobId, t.globusTaskId, t.datasetPid, bytesTransferred, filesTransferred, totalFiles, completed, err)
-		statusCode := "002"
-		statusMessage := "transferring"
-		errMsg := ""
-		if err != nil {
-			statusCode = "998"
-			statusMessage = "an error has occured during task polling, this job is not updated anymore"
-			errMsg = err.Error()
+		select {
+		case <-t.cancel:
+			t.cancelTask()
+			return
+		default:
 		}
-		token, err := t.scicatServiceUser.GetToken()
-		if err != nil {
-			log.Printf("getting token failed, task with scicat job id '%s', dataset pid '%s', globus id '%s' cannot be updated: %s\n", t.scicatJobId, t.datasetPid, t.globusTaskId, err.Error())
-			break
-		}
-		if completed {
-			statusCode = "003"
-			statusMessage = "finished"
-		}
-		_, err = UpdateGlobusTransferScicatJob(
-			*t.scicatUrl,
-			token,
-			t.scicatJobId,
-			statusCode,
-			statusMessage,
-			jobs.JobResultObject{
-				GlobusTaskId:     t.globusTaskId,
-				BytesTransferred: uint(bytesTransferred),
-				FilesTransferred: uint(filesTransferred),
-				FilesTotal:       uint(totalFiles),
-				Completed:        completed,
-				Error:            errMsg,
-			},
-		)
-		if completed || (err != nil) {
+		completed, err = t.updateTask()
+		if completed || err != nil {
 			break
 		}
 		time.Sleep(t.taskPollInterval)
@@ -70,9 +48,59 @@ func (t transferTask) execute() {
 	if !completed || err != nil {
 		return // if not completed or error'd, don't mark the dataset as archivable
 	}
+	t.finishTask()
+}
 
+func (t transferTask) updateTask() (bool, error) {
+	bytesTransferred, filesTransferred, totalFiles, completed, err := checkTransfer(t.globusClient, t.globusTaskId)
+
+	status := jobs.Transferring
+	statusCode := "002"
+	statusMessage := "transferring"
+	errMsg := ""
+
+	if err != nil {
+		status = jobs.Failed
+		statusCode = "998"
+		statusMessage = "an error has occured during task polling, this job is not updated anymore"
+		errMsg = err.Error()
+	} else if completed {
+		status = jobs.Finished
+		statusCode = "003"
+		statusMessage = "finished"
+	}
+
+	taskLog(t.scicatJobId, t.globusTaskId, t.datasetPid, bytesTransferred, filesTransferred, totalFiles, status, err)
+
+	token, err := t.scicatServiceUser.GetToken()
+	if err != nil {
+		errFull := fmt.Errorf("getting token failed, task with scicat job id '%s', dataset pid '%s', globus id '%s' cannot be updated: %s", t.scicatJobId, t.datasetPid, t.globusTaskId, err.Error())
+		log.Println(errFull.Error())
+		return false, errFull
+	}
+
+	_, err = UpdateGlobusTransferScicatJob(
+		*t.scicatUrl,
+		token,
+		t.scicatJobId,
+		statusCode,
+		statusMessage,
+		jobs.JobResultObject{
+			GlobusTaskId:     t.globusTaskId,
+			BytesTransferred: uint(bytesTransferred),
+			FilesTransferred: uint(filesTransferred),
+			FilesTotal:       uint(totalFiles),
+			Status:           status,
+			Error:            errMsg,
+		},
+	)
+
+	return completed, err
+}
+
+func (t transferTask) finishTask() {
 	token, _ := t.scicatServiceUser.GetToken()
-	err = datasetIngestor.MarkFilesReady(http.DefaultClient, *t.scicatUrl+"api/v3", t.datasetPid, map[string]string{"accessToken": token})
+	err := datasetIngestor.MarkFilesReady(http.DefaultClient, *t.scicatUrl+"api/v3", t.datasetPid, map[string]string{"accessToken": token})
 	if err != nil {
 		errMsg := err.Error()
 
@@ -83,13 +111,57 @@ func (t transferTask) execute() {
 			"997",
 			"completed but can't mark dataset as archivable",
 			jobs.JobResultObject{
-				Error: errMsg,
+				GlobusTaskId:     t.globusTaskId,
+				BytesTransferred: t.bytesTransferred,
+				FilesTransferred: t.filesTransferred,
+				FilesTotal:       t.filesTotal,
+				Status:           jobs.Finished,
+				Error:            errMsg,
 			},
 		)
 		if err != nil {
-			log.Printf("the job is completed but can't mark dataset as archivable: %s\n", errMsg)
+			taskLog(t.scicatJobId, t.globusTaskId, t.datasetPid, int(t.bytesTransferred), int(t.filesTransferred), int(t.filesTotal), jobs.Finished, err)
 		}
 	}
+}
+
+func (t transferTask) cancelTask() error {
+	status := jobs.Cancelled
+	statusCode := "003"
+	statusMessage := "cancelled"
+	errMsg := ""
+
+	_, err := t.globusClient.TransferCancelTaskByID(t.globusTaskId)
+	if err != nil {
+		status = jobs.Failed
+		statusCode = "996"
+		statusMessage = "cancelling failed"
+		errMsg = "failed cancelling globus transfer task: " + err.Error()
+	}
+
+	token, err := t.scicatServiceUser.GetToken()
+	if err != nil {
+		taskLog(t.scicatJobId, t.globusTaskId, t.datasetPid, int(t.bytesTransferred), int(t.filesTransferred), int(t.filesTotal), jobs.Cancelled, err)
+		return err
+	}
+
+	_, err = UpdateGlobusTransferScicatJob(
+		*t.scicatUrl,
+		token,
+		t.scicatJobId,
+		statusCode,
+		statusMessage,
+		jobs.JobResultObject{
+			GlobusTaskId:     t.globusTaskId,
+			BytesTransferred: t.bytesTransferred,
+			FilesTransferred: t.filesTransferred,
+			FilesTotal:       t.filesTotal,
+			Status:           status,
+			Error:            errMsg,
+		},
+	)
+
+	return err
 }
 
 func checkTransfer(client globus.GlobusClient, globusTaskId string) (bytesTransferred int, filesTransferred int, totalFiles int, completed bool, err error) {
@@ -119,10 +191,10 @@ func checkTransfer(client globus.GlobusClient, globusTaskId string) (bytesTransf
 	}
 }
 
-func taskLog(sciacatJobId string, globusTaskId string, datasetPid string, bytesTransferred int, filesTransferred int, totalFiles int, completed bool, err error) {
+func taskLog(sciacatJobId string, globusTaskId string, datasetPid string, bytesTransferred int, filesTransferred int, totalFiles int, status jobs.JobStatus, err error) {
 	errString := ""
 	if err != nil {
 		errString = err.Error()
 	}
-	log.Printf("'%s' scicat job, '%s' globus task for '%s' dataset - bytes transferred: %d, files transferred: %d, total files detected: %d, completed %v, error message: '%s'\n", sciacatJobId, globusTaskId, datasetPid, bytesTransferred, filesTransferred, totalFiles, completed, errString)
+	log.Printf("'%s' scicat job, '%s' globus task for '%s' dataset - bytes transferred: %d, files transferred: %d, total files detected: %d, status %s, error message: '%s'\n", sciacatJobId, globusTaskId, datasetPid, bytesTransferred, filesTransferred, totalFiles, status, errString)
 }

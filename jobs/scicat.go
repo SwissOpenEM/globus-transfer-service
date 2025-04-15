@@ -17,13 +17,22 @@ type JobParams struct {
 	DatasetList []Dataset `json:"datasetList"`
 }
 
+type JobStatus string
+
+const (
+	Cancelled    JobStatus = "cancelled"
+	Failed       JobStatus = "failed"
+	Finished     JobStatus = "finished"
+	Transferring JobStatus = "transferring"
+)
+
 type JobResultObject struct {
-	GlobusTaskId     string `json:"globusTaskId"`
-	BytesTransferred uint   `json:"bytesTransferred"`
-	FilesTransferred uint   `json:"filesTransferred"`
-	FilesTotal       uint   `json:"filesTotal"`
-	Completed        bool   `json:"completed"`
-	Error            string `json:"error"`
+	GlobusTaskId     string    `json:"globusTaskId"`
+	BytesTransferred uint      `json:"bytesTransferred"`
+	FilesTransferred uint      `json:"filesTransferred"`
+	FilesTotal       uint      `json:"filesTotal"`
+	Status           JobStatus `json:"status"`
+	Error            string    `json:"error"`
 }
 
 type ScicatJob struct {
