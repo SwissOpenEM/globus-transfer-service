@@ -160,7 +160,7 @@ components:
 
   responses:
     GeneralErrorResponse:
-      description: a general error resposne
+      description: a general error response
       content:
         application/json:
           schema:
