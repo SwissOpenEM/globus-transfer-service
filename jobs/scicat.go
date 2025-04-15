@@ -125,8 +125,6 @@ func GetJobById(scicatUrl string, scicatToken string, jobId string) (ScicatJob, 
 		}
 	}
 	if resp.StatusCode != 200 {
-		b, _ := io.ReadAll(resp.Body)
-		fmt.Printf("\n\n\nHELLO BELLO: '%s'\n\n\n", string(b))
 		return ScicatJob{}, fmt.Errorf("unknown error - statuscode: %d, status: %s", resp.StatusCode, resp.Status)
 	}
 
