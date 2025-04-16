@@ -6,7 +6,7 @@ require (
 	github.com/getkin/kin-openapi v0.127.0
 	github.com/gin-gonic/gin v1.10.0
 	github.com/oapi-codegen/runtime v1.1.1
-	github.com/paulscherrerinstitute/scicat-cli/v3 v3.0.0-alpha3.0.20250404090922-5771cbbc3b6e
+	github.com/paulscherrerinstitute/scicat-cli/v3 v3.0.0-alpha3.0.20250416155101-64158adebeb3
 	github.com/swaggo/files v1.0.1
 	github.com/swaggo/gin-swagger v1.6.0
 )
