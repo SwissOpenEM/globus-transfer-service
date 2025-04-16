@@ -226,7 +226,7 @@ func (s ServerHandler) PostTransferTask(ctx context.Context, request PostTransfe
 
 	// return response
 	return PostTransferTask200JSONResponse{
-		JobId: getPointerOrNil(scicatJob.ID),
+		JobId: scicatJob.ID,
 	}, nil
 }
 
