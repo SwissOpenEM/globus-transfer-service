@@ -86,6 +86,13 @@ func GetJobList(scicatUrl string, scicatToken string, filter string) ([]ScicatJo
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode == 400 {
+		return []ScicatJob{}, fmt.Errorf("getting transfer job list failed: bad request - likely bad filter was passed")
+	}
+	if resp.StatusCode != 200 {
+		return []ScicatJob{}, fmt.Errorf("getting transfer job list failed with unknwon error - status code %d, status %s", resp.StatusCode, resp.Status)
+	}
+
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return []ScicatJob{}, err
