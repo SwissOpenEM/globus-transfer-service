@@ -51,6 +51,11 @@ func (tp TaskPool) AddTransferTask(globusTaskId string, datasetPid string, scica
 		scicatJobId:       scicatJobId,
 		taskPollInterval:  tp.taskPollInterval,
 		cancel:            tp.cancelTask[scicatJobId],
+		cleanup: func() {
+			tp.cancelMutex.Lock()
+			defer tp.cancelMutex.Unlock()
+			delete(tp.cancelTask, scicatJobId)
+		},
 	}
 
 	return tp.pool.Submit(task.execute)
@@ -61,7 +66,6 @@ func (tp TaskPool) CancelTransferTask(scicatJobId string) error {
 	defer tp.cancelMutex.Unlock()
 	if cancelChannel, ok := tp.cancelTask[scicatJobId]; ok {
 		cancelChannel <- struct{}{}
-		delete(tp.cancelTask, scicatJobId)
 		return nil
 	}
 	return &JobNotExistError{fmt.Sprintf("job with ID '%s' does not exist or is already cancelled/removed", scicatJobId)}

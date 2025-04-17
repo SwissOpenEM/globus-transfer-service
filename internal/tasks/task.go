@@ -21,6 +21,7 @@ type transferTask struct {
 	scicatJobId       string
 	taskPollInterval  time.Duration
 	cancel            chan struct{}
+	cleanup           func()
 
 	// current status
 	bytesTransferred uint
@@ -29,8 +30,11 @@ type transferTask struct {
 }
 
 func (t transferTask) execute() {
+	defer t.cleanup()
+
 	completed := false
 	var err error = nil
+
 	for {
 		select {
 		case <-t.cancel:
