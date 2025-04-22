@@ -285,7 +285,7 @@ func (s ServerHandler) DeleteTransferTask(ctx context.Context, req DeleteTransfe
 		JobNotFoundErr := &jobs.JobNotFoundErr{}
 		if errors.As(err, &JobNotExistErr) || errors.As(err, &JobDelete400Err) || errors.As(err, &JobNotFoundErr) {
 			return DeleteTransferTask400JSONResponse{GeneralErrorResponseJSONResponse{
-				Message: getPointerOrNil("the requested job does not exist or is already finished, cancelled or deleted"),
+				Message: getPointerOrNil("the requested job does not exist or is already finished or cancelled"),
 			}}, nil
 		}
 		return DeleteTransferTask500JSONResponse{
