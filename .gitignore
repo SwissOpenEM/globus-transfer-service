@@ -1,2 +1,2 @@
-globus-transfer-service-conf.yaml
+*/api-server/*.yaml
 build/
