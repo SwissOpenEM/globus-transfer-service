@@ -63,6 +63,14 @@ func (e *JobNotFoundErr) Error() string {
 	return e.msg
 }
 
+type fullFacetReplyElement struct {
+	All []fullFacetInternalObject `json:"all"`
+}
+
+type fullFacetInternalObject struct {
+	TotalSets uint `json:"totalSets"`
+}
+
 func GetJobList(scicatUrl string, scicatToken string, filter string) ([]ScicatJob, error) {
 	url, err := url.JoinPath(scicatUrl, "api", "v4", "jobs")
 	if err != nil {
@@ -101,6 +109,58 @@ func GetJobList(scicatUrl string, scicatToken string, filter string) ([]ScicatJo
 	jobs := []ScicatJob{}
 	err = json.Unmarshal(body, &jobs)
 	return jobs, err
+}
+
+func GetJobCount(scicatUrl string, scicatToken string, filter string) (uint, error) {
+	url, err := url.JoinPath(scicatUrl, "api", "v4", "fullfacet")
+	if err != nil {
+		return 0, err
+	}
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return 0, err
+	}
+
+	q := req.URL.Query()
+	q.Set("filter", filter)
+	req.URL.RawQuery = q.Encode()
+
+	req.Header.Set("Authorization", "Bearer "+scicatToken)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return 0, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == 400 {
+		return 0, fmt.Errorf("getting transfer job list failed: bad request - likely bad filter was passed")
+	}
+	if resp.StatusCode != 200 {
+		return 0, fmt.Errorf("getting transfer job list failed with unknwon error - status code %d, status %s", resp.StatusCode, resp.Status)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return 0, err
+	}
+
+	result := []fullFacetReplyElement{}
+	err = json.Unmarshal(body, &result)
+	if err != nil {
+		return 0, err
+	}
+
+	if len(result) != 1 {
+		return 0, fmt.Errorf("server replied with an unexpected number of reply objects in its response")
+	}
+
+	if len(result[0].All) != 1 {
+		return 0, fmt.Errorf("the 'All' element in the server response contains an unexpected number of objects")
+	}
+
+	return result[0].All[0].TotalSets, nil
 }
 
 func GetJobById(scicatUrl string, scicatToken string, jobId string) (ScicatJob, error) {
