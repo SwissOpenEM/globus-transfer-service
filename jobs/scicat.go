@@ -98,7 +98,7 @@ func GetJobList(scicatUrl string, scicatToken string, filter string) ([]ScicatJo
 		return []ScicatJob{}, fmt.Errorf("getting transfer job list failed: bad request - likely bad filter was passed")
 	}
 	if resp.StatusCode != 200 {
-		return []ScicatJob{}, fmt.Errorf("getting transfer job list failed with unknwon error - status code %d, status %s", resp.StatusCode, resp.Status)
+		return []ScicatJob{}, fmt.Errorf("getting transfer job list failed with unknown error - status code %d, status %s", resp.StatusCode, resp.Status)
 	}
 
 	body, err := io.ReadAll(resp.Body)
@@ -112,7 +112,7 @@ func GetJobList(scicatUrl string, scicatToken string, filter string) ([]ScicatJo
 }
 
 func GetJobCount(scicatUrl string, scicatToken string, filter string) (uint, error) {
-	url, err := url.JoinPath(scicatUrl, "api", "v4", "fullfacet")
+	url, err := url.JoinPath(scicatUrl, "api", "v4", "jobs", "fullfacet")
 	if err != nil {
 		return 0, err
 	}
@@ -135,10 +135,10 @@ func GetJobCount(scicatUrl string, scicatToken string, filter string) (uint, err
 	defer resp.Body.Close()
 
 	if resp.StatusCode == 400 {
-		return 0, fmt.Errorf("getting transfer job list failed: bad request - likely bad filter was passed")
+		return 0, fmt.Errorf("getting transfer job count failed: bad request - likely bad filter was passed")
 	}
 	if resp.StatusCode != 200 {
-		return 0, fmt.Errorf("getting transfer job list failed with unknwon error - status code %d, status %s", resp.StatusCode, resp.Status)
+		return 0, fmt.Errorf("getting transfer job count failed with unknown error - status code %d, status %s", resp.StatusCode, resp.Status)
 	}
 
 	body, err := io.ReadAll(resp.Body)
