@@ -115,7 +115,14 @@ func ScicatTokenAuthMiddleware(scicatUrl string) gin.HandlerFunc {
 		}
 
 		var user User
-		json.Unmarshal(body, &user)
+		err = json.Unmarshal(body, &user)
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusInternalServerError, GeneralError{
+				Message: "an error occured when unmarshaling the user identity response",
+				Details: err.Error(),
+			})
+		}
+
 		user.ScicatToken = scicatApiKey
 		c.Set("scicatUser", user)
 		c.Next()

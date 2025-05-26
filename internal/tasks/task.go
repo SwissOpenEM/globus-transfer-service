@@ -38,7 +38,7 @@ func (t transferTask) execute() {
 	for {
 		select {
 		case <-t.cancel:
-			t.cancelTask()
+			_ = t.cancelTask()
 			return
 		default:
 		}
