@@ -17,12 +17,10 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: "stable"
-      - name: Generate server
-        run: go generate ./internal/api
       - name: Go linting (golangci-lint)
         uses: golangci/golangci-lint-action@v8
         with:
-          version: v2.1
+          version: v2.3
   go_tests:
     strategy:
       fail-fast: false
