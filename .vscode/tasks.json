@@ -1,0 +1,22 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "build service",
+            "type": "shell",
+            "options": {
+                "cwd": "${workspaceFolder}/cmd/api-server"
+            },
+            "command": "go",
+            "args": [
+                "build",
+                "-tags",
+                "dev",
+                "-gcflags",
+                "all=-N -l",
+                "-o",
+                "build/server"
+            ]
+        },
+    ]
+}
