@@ -40,8 +40,6 @@ jobs:
           go-version: "stable"
       - name: Set up gotestfmt
         uses: gotesttools/gotestfmt-action@v2
-      - name: Install dependencies
-        run: go get .
       - name: Run go tests
         run: |
           set -euo pipefail
