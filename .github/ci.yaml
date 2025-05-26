@@ -54,6 +54,7 @@ jobs:
           name: Go Test Result on ${{ matrix.build.goos }} (${{ matrix.build.os }})
           path: ./Go-Test-${{ matrix.build.os }}.json
   build_push_docker_image:
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - name: Log into '${{ env.DOCKER_REGISTRY }}' docker registry 
