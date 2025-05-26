@@ -42,3 +42,6 @@ You can find an example of the settings at [`example-conf.yaml`](example-conf.ya
  - `GLOBUS_CLIENT_SECRET` - the client secret for the service account (2-legged OAUTH, trusted client model)
  - `SCICAT_SERVICE_USER_USERNAME` - the username for the service user to use for creating transfer jobs in scicat
  - `SCICAT_SERVICE_USER_PASSWORD` - the above user's password
+
+## Docker images
+Docker images are built and pushed for every modification and tags added to the `master` branch
