@@ -20,7 +20,12 @@ import (
 )
 
 func (s ServerHandler) PostTransferTask(ctx context.Context, request PostTransferTaskRequestObject) (PostTransferTaskResponseObject, error) {
-	ginCtx := ctx.(*gin.Context)
+	ginCtx, ok := ctx.(*gin.Context)
+	if !ok {
+		return PostTransferTask500JSONResponse{
+			Message: getPointerOrNil("context error"),
+		}, nil
+	}
 
 	// check facility id's and fetch collection id's
 	sourceCollectionID, ok := s.facilityCollectionIDs[request.Params.SourceFacility]
@@ -231,7 +236,12 @@ func (s ServerHandler) PostTransferTask(ctx context.Context, request PostTransfe
 }
 
 func (s ServerHandler) DeleteTransferTask(ctx context.Context, req DeleteTransferTaskRequestObject) (DeleteTransferTaskResponseObject, error) {
-	ginCtx := ctx.(*gin.Context)
+	ginCtx, ok := ctx.(*gin.Context)
+	if !ok {
+		return DeleteTransferTask500JSONResponse{
+			Message: getPointerOrNil("context error"),
+		}, nil
+	}
 
 	// fetch scicat user
 	u, ok := ginCtx.Get("scicatUser")
